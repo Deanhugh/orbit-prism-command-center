@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Enter Orbit Prism</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #0b0b0d; color: #f4f4f5; font: 14px/1.45 system-ui, sans-serif; }
+      main { min-height: 100%; display: grid; place-items: center; padding: 24px; }
+      a { color: #fff; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p id="status">Starting a guest session…</p>
+    </main>
+    <script>
+      fetch("/api/auth/guest", { method: "POST" })
+        .then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+          window.location.replace("/jarvis");
+        })
+        .catch(function () {
+          window.location.replace("/api/auth/guest");
+        });
+    </script>
+    <noscript>
+      <p><a href="/api/auth/guest">Continue as guest</a></p>
+    </noscript>
+  </body>
+</html>
