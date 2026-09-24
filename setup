@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "→ Orbit Prism Operating System — setup"
+
+# Node
+if ! command -v node >/dev/null 2>&1; then
+  echo "✗ Node.js not found. Install Node 20+ from https://nodejs.org"
+  exit 1
+fi
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$NODE_MAJOR" -lt 20 ]; then
+  echo "✗ Node 20+ required (found $(node -v))"
+  exit 1
+fi
+echo "✓ Node $(node -v)"
+
+# Claude Code (optional — enables LIVE mode)
+if command -v claude >/dev/null 2>&1; then
+  echo "✓ Claude Code found — the office can run LIVE"
+  claude mcp list >/dev/null 2>&1 && echo "✓ MCP connectors detected" || echo "· no MCP connectors yet (add with: claude mcp add)"
+else
+  echo "· Claude Code not found — the office will run in DEMO mode"
+  echo "  Install Claude Code and log in to enable live agent work."
+fi
+
+echo "→ Installing dependencies"
+npm install
+
+echo "→ Building"
+npm run build
+
+echo ""
+echo "✓ Done. Start the office with:  npm start"
+echo "  Then open http://localhost:43140"

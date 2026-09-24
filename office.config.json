@@ -1,8 +1,8 @@
 {
   "name": "Orbit Prism Operating System",
   "studio": "Northwind Atelier",
-  "brain": "./brain",
-  "vaultId": "",
+  "brain": "/Users/howardvernon/Main/Obsidian/Orbit Prism",
+  "vaultId": "e11eb5f056363b9d",
   "port": 43140,
   "model": "sonnet",
   "mcp": { "allow": [], "deny": [], "departments": {} },
