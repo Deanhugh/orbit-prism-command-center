@@ -1,0 +1,41 @@
+{
+  "name": "orbit-prism-operating-system",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 43140",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 43140",
+    "preview": "next start -H 0.0.0.0 -p 43140",
+    "lint": "eslint",
+    "seed:vault": "node scripts/seed-vault.mjs",
+    "build:pdf": "node scripts/build-pdf.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "clsx": "^2.1.1",
+    "d3-force": "^3.0.0",
+    "lucide-react": "^1.46.0",
+    "next": "16.3.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "simple-icons": "^16.31.0",
+    "tailwind-merge": "^3.7.0",
+    "three": "^0.186.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/d3-force": "^3.0.10",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "^0.186.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "marked": "^18.0.13",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

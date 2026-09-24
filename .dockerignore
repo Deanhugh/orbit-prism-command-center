@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+data
+*.log
+office.config.local.json
+brain/Orbit Prism Operating System

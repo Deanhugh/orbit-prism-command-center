@@ -1,0 +1,10 @@
+{
+  "name": "Orbit Prism Operating System",
+  "studio": "Northwind Atelier",
+  "brain": "./brain",
+  "vaultId": "",
+  "port": 43140,
+  "model": "sonnet",
+  "mcp": { "allow": [], "deny": [], "departments": {} },
+  "tools": { "web": true }
+}
