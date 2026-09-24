@@ -1,1 +1,21 @@
-placeholder
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { ArrowUp, Check, ChevronDown, ChevronRight, Mic, Plus, Settings } from "lucide-react";
+import type { AgentConversation, ChatMessage, ChatToolStep } from "@/lib/agents-types";
+import type { AgentRuntimeInfo, Task } from "@/lib/types";
+import { DEPARTMENTS } from "@/lib/office-data";
+import { useOrbitInit } from "@/lib/use-orbit-init";
+import { useOffice } from "@/lib/store";
+import { useVoice } from "@/lib/use-voice";
+import { HeaderControls } from "@/components/chrome/HeaderControls";
+import { PageNav } from "@/components/chrome/PageNav";
+import { BrainGraphOverlay } from "@/components/chrome/BrainGraphOverlay";
+import { Brand } from "@/components/chrome/Brand";
+import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
+import { ComposerPlus } from "@/components/agents/ComposerPlus";
+import { OfficeSafe } from "@/components/agents/OfficeSafe";
+import { cn, timeAgo } from "@/lib/utils";
