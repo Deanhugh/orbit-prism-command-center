@@ -1,8 +1,9 @@
 # Orbit Prism Operating System — persistent Node server (for Railway or any container host)
 FROM node:20-slim AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json ./
+COPY package-lock.json* ./
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
 FROM node:20-slim AS builder
 WORKDIR /app
