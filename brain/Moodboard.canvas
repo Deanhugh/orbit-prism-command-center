@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    { "id": "n1", "type": "file", "file": "Brand Board.md", "x": -200, "y": -120, "width": 320, "height": 200 },
+    { "id": "n2", "type": "file", "file": "attachments/brand-board.png", "x": 160, "y": -120, "width": 320, "height": 220 },
+    { "id": "n3", "type": "file", "file": "Brand Voice.md", "x": -200, "y": 140, "width": 320, "height": 200 },
+    { "id": "n4", "type": "text", "text": "Northwind moodboard", "x": 160, "y": 160, "width": 240, "height": 80 }
+  ],
+  "edges": [
+    { "id": "e1", "fromNode": "n1", "toNode": "n2" },
+    { "id": "e2", "fromNode": "n1", "toNode": "n3" }
+  ]
+}
