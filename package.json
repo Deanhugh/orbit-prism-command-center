@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 43140",
+    "prebuild": "node scripts/decode-b64-assets.mjs",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 43140",
     "preview": "next start -H 0.0.0.0 -p 43140",

@@ -9,6 +9,7 @@ FROM node:20-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN node scripts/decode-b64-assets.mjs
 RUN npm run build
 
 FROM node:20-slim AS runner
@@ -29,4 +30,4 @@ RUN mkdir -p /app/data /app/brain
 EXPOSE 43140
 # Railway provides $PORT; fall back to 43140 locally.
 # Do not force ORBIT_MODE=demo — set that in Railway only if you want simulated work.
-CMD ["sh", "-c", "npx next start -p ${PORT:-43140}"]
+CMD ["sh", "-c", "npx next start -p ${PORT:-43140}]"]
