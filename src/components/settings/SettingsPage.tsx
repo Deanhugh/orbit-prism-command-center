@@ -84,3 +84,18 @@ function SettingsInner() {
     </div>
   );
 }
+
+async function probeMacOllama(): Promise<{ ok: boolean; models: string[]; reason: string }> {
+  for (const url of ["http://127.0.0.1:11434/api/tags", "http://localhost:11434/api/tags"]) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) continue;
+      const data = await res.json() as { models?: { name?: string }[] };
+      const models = (data.models || []).map((m) => m.name).filter((n): n is string => Boolean(n));
+      return { ok: true, models, reason: `this Mac can see Ollama (${models.length} model${models.length === 1 ? "" : "s"})` };
+    } catch {
+      /* CORS or not running */
+    }
+  }
+  return { ok: false, models: [], reason: "this browser cannot reach 127.0.0.1:11434" };
+}
