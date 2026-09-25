@@ -1,15 +1,20 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { DEPARTMENTS } from "@/lib/office-data";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { cn } from "@/lib/utils";
 import { PageNav } from "@/components/chrome/PageNav";
 import { Brand } from "@/components/chrome/Brand";
-import { McpBrowse, type McpCatalogRow } from "@/components/settings/McpBrowse";
-import { MCP_CATALOG } from "@/lib/mcp-catalog";
+import { Providers } from "@/components/settings/settings-providers";
+import { Connectors } from "@/components/settings/settings-connectors";
+import { Skills } from "@/components/settings/settings-skills";
+
+export { Providers } from "@/components/settings/settings-providers";
+export { Connectors } from "@/components/settings/settings-connectors";
+export { Skills } from "@/components/settings/settings-skills";
+export { Plugins } from "@/components/settings/settings-plugins";
 
 type Tab = "providers" | "connectors" | "skills";
 const TAB_LABEL: Record<Tab, string> = {
@@ -28,13 +33,6 @@ function tabFromQuery(raw: string | null): Tab {
   if (raw === "skills" || raw === "providers") return raw;
   return "providers";
 }
-
-interface ProviderRow {
-  id: string; label: string; local: boolean; openaiCompatible: boolean;
-  keyName: string | null; hasKey: boolean; baseUrl: string | null;
-  ok: boolean; reason: string;
-}
-interface Cfg { provider: string; model: string; temperature: number; composio: boolean }
 
 export function SettingsPage() {
   return (
@@ -83,19 +81,4 @@ function SettingsInner() {
       </div>
     </div>
   );
-}
-
-async function probeMacOllama(): Promise<{ ok: boolean; models: string[]; reason: string }> {
-  for (const url of ["http://127.0.0.1:11434/api/tags", "http://localhost:11434/api/tags"]) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-      if (!res.ok) continue;
-      const data = await res.json() as { models?: { name?: string }[] };
-      const models = (data.models || []).map((m) => m.name).filter((n): n is string => Boolean(n));
-      return { ok: true, models, reason: `this Mac can see Ollama (${models.length} model${models.length === 1 ? "" : "s"})` };
-    } catch {
-      /* CORS or not running */
-    }
-  }
-  return { ok: false, models: [], reason: "this browser cannot reach 127.0.0.1:11434" };
 }
