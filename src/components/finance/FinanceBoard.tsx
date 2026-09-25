@@ -81,6 +81,7 @@ export function FinanceBoard() {
       </header>
 
       <div className="mx-auto max-w-[1200px] px-6 py-4">
+        {/* view switch + status + open-in-bigcapital */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="flex gap-1 rounded-full border border-line bg-panel p-0.5">
             {(["dashboard", "books"] as View[]).map((v) => (
@@ -218,7 +219,7 @@ function BooksEmbed({ appUrl, live }: { appUrl?: string; live?: boolean }) {
     return (
       <div className="rounded-lg border border-line bg-panel p-10 text-center text-[12px] text-ink-soft">
         <p className="text-ink">No Bigcapital app URL set.</p>
-        <p className="mt-1">Add your Bigcapital web address under <a href="/settings" className="underline">Settings → Connectors → Finance</a> to embed the full books here.</p>
+        <p className="mt-1">Add your Bigcapital web address under <a href="/jarvis/settings?tab=mcp" className="underline">Settings → MCP → Finance</a> to embed the full books here.</p>
       </div>
     );
   }
