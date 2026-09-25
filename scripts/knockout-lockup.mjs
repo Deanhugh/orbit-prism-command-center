@@ -135,12 +135,21 @@ export function knockOutDarkPngBackground(buf) {
   bb /= 4;
   const bgLum = 0.299 * br + 0.587 * bg + 0.114 * bb;
   if (bgLum > 80) return buf;
-  const floor = bgLum + 10;
+  const floor = Math.max(bgLum + 28, 48);
   const span = Math.max(1, 255 - floor);
   for (let i = 0; i < rgba.length; i += 4) {
     const lum = 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
     const alpha = Math.max(0, Math.min(255, Math.round(((lum - floor) / span) * 255)));
     rgba[i + 3] = Math.min(rgba[i + 3], alpha);
+    if (rgba[i + 3] === 0) {
+      rgba[i] = 0;
+      rgba[i + 1] = 0;
+      rgba[i + 2] = 0;
+    } else {
+      rgba[i] = 255;
+      rgba[i + 1] = 255;
+      rgba[i + 2] = 255;
+    }
   }
   return writePngRgba(width, height, rgba);
 }
