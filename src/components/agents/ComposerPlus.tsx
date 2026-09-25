@@ -163,10 +163,10 @@ export function ComposerPlus({
               onDisable={disable}
               busyId={busyId}
               onCustom={() => {
-                window.location.href = "/settings?tab=mcp#add-mcp";
+                window.location.href = "/jarvis/settings?tab=mcp#add-mcp";
               }}
             />
-            <Link href="/settings?tab=mcp#add-mcp" className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-ops hover:underline">
+            <Link href="/jarvis/settings?tab=mcp#add-mcp" className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-ops hover:underline">
               <Plus size={12} /> Add a custom MCP in Settings
             </Link>
           </div>
