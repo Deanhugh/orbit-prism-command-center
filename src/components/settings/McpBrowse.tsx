@@ -112,7 +112,7 @@ export function McpBrowse({
         </p>
       )}
       {compact && !onCustom && (
-        <Link href="/settings?tab=mcp" className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-ops hover:underline">
+        <Link href="/jarvis/settings?tab=mcp" className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-ops hover:underline">
           <Plus size={12} /> Browse &amp; add in Settings
         </Link>
       )}
