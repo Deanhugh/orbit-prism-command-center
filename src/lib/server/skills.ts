@@ -161,13 +161,16 @@ export function loadSkills(): Skill[] {
   return skills;
 }
 
-export function skillsForAgent(agentId: string, dept: DeptId): Skill[] {
+export function skillsForAgent(agentId: string, dept?: DeptId | string | null): Skill[] {
   const id = agentId.toLowerCase();
-  return loadSkills().filter(
-    (s) =>
-      s.agents.includes(id) ||
-      s.agents.includes("all") ||
-      s.department === dept ||
-      s.department === "all",
-  );
+  const isChief = id === "jarvis" || id === "chief";
+  const deptId = dept ? String(dept).toLowerCase() : "";
+  return loadSkills().filter((s) => {
+    const agents = (s.agents || []).map((a) => a.toLowerCase());
+    if (agents.includes(id) || agents.includes("all")) return true;
+    if (isChief && (agents.includes("jarvis") || agents.includes("chief"))) return true;
+    if (isChief && s.department === "all") return true;
+    if (deptId && (s.department === deptId || s.department === "all")) return true;
+    return false;
+  });
 }
