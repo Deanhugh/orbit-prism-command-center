@@ -160,7 +160,7 @@ for (const root of roots) {
       const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
       const text = ordered
         .map((p) => fs.readFileSync(p.file, "utf8"))
-               .join("")
+        .join("")
         .replace(/\s+/g, "");
       const data = Buffer.from(text, "base64");
       if (!looksLikeImage(dest, data)) {
