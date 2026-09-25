@@ -1,4 +1,4 @@
-"use client";
+use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { useOrbitInit } from "@/lib/use-orbit-init";
@@ -173,6 +173,8 @@ export function PmoBoard() {
 function PlatformEmbed({ appUrl, live, onViewBoard }: { appUrl?: string; live?: boolean; onViewBoard: () => void }) {
   const src = useMemo(() => appUrl, [appUrl]);
 
+  // Until a live instance is connected, don't show a blank frame — explain what
+  // this view is and point to the Board (which works now) and Settings.
   if (!live) {
     return (
       <div className="grid min-h-[60vh] place-items-center rounded-lg border border-dashed border-line bg-panel/60 p-8 text-center">
