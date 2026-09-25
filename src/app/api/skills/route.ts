@@ -12,6 +12,7 @@ export async function GET() {
     department: s.department,
     agents: s.agents.map((id) => agentById(id)?.name || id),
     path: s.path,
+    source: s.source,
   }));
   return NextResponse.json({ skills });
 }

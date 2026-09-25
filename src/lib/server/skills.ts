@@ -3,6 +3,8 @@ import path from "node:path";
 import type { DeptId } from "../types";
 import { brainDir, repoSkillsDir, skillsDir } from "./config";
 
+export type SkillSource = "github" | "uploaded" | "brain";
+
 export interface Skill {
   name: string;
   description: string;
@@ -10,6 +12,43 @@ export interface Skill {
   department?: string;
   path: string;
   body: string;
+  source: SkillSource;
+}
+
+export const GITHUB_SKILLS_REPO = {
+  owner: "Deanhugh",
+  name: "orbit-prism-command-center",
+  treeUrl: "https://github.com/Deanhugh/orbit-prism-command-center/tree/main/skills",
+  newFileUrl:
+    "https://github.com/Deanhugh/orbit-prism-command-center/new/main?filename=skills/my-skill/SKILL.md",
+};
+
+export function slugifySkillName(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "skill";
+}
+
+function classifySource(file: string): SkillSource {
+  const abs = path.resolve(file);
+  if (abs.startsWith(path.resolve(repoSkillsDir()) + path.sep) || abs === path.resolve(repoSkillsDir())) {
+    return "github";
+  }
+  if (abs.startsWith(path.resolve(skillsDir()) + path.sep) || abs === path.resolve(skillsDir())) {
+    return "uploaded";
+  }
+  return "brain";
+}
+
+export function writeUploadedSkill(markdown: string, fallbackName: string): { name: string; path: string } {
+  const raw = markdown.replace(/^\uFEFF/, "");
+  if (!raw.trim()) throw new Error("empty skill file");
+  const { data } = parseFrontMatter(raw);
+  const fromFile = fallbackName.replace(/\.md$/i, "").replace(/^skill$/i, "");
+  const name = slugifySkillName(String(data.name || fromFile || "uploaded-skill"));
+  const dir = path.join(skillsDir(), name);
+  fs.mkdirSync(dir, { recursive: true });
+  const dest = path.join(dir, "SKILL.md");
+  fs.writeFileSync(dest, raw.endsWith("\n") ? raw : `${raw}\n`);
+  return { name, path: path.relative(process.cwd(), dest) };
 }
 
 function parseFrontMatter(raw: string): {
@@ -78,6 +117,7 @@ function toSkill(name: string, raw: string, file: string): Skill {
     department: (data.department as string | undefined)?.toLowerCase(),
     path: path.relative(process.cwd(), file),
     body,
+    source: classifySource(file),
   };
 }
 
