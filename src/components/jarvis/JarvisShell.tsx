@@ -208,7 +208,7 @@ function SidebarBody({
               height={47}
               priority
               unoptimized
-              className="h-auto w-full bg-transparent"
+              className="h-auto w-full bg-transparent [mix-blend-mode:screen]"
             />
           </a>
         ) : (
