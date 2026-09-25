@@ -73,6 +73,21 @@ function groupByPrefix(files, extRe) {
   return groups;
 }
 
+function looksLikeImage(dest, data) {
+  if (!data || data.length < 16) return false;
+  const png = data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47;
+  const jpg = data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
+  const ico = data[0] === 0x00 && data[1] === 0x00 && data[2] === 0x01 && data[3] === 0x00;
+  const webp = data.slice(0, 4).toString("ascii") === "RIFF" && data.slice(8, 12).toString("ascii") === "WEBP";
+  const pdf = data.slice(0, 4).toString("ascii") === "%PDF";
+  if (dest.endsWith(".png")) return png;
+  if (dest.endsWith(".jpg") || dest.endsWith(".jpeg")) return jpg;
+  if (dest.endsWith(".ico")) return ico;
+  if (dest.endsWith(".webp")) return webp;
+  if (dest.endsWith(".pdf")) return pdf;
+  return png || jpg || ico || webp || pdf;
+}
+
 const roots = ["public", "assets", "brain", "src"];
 let count = 0;
 const hexDests = new Set();
@@ -92,6 +107,9 @@ for (const root of roots) {
       const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
       const chunks = ordered.map((p) => decodeHexPart(fs.readFileSync(p.file, "utf8")));
       const data = Buffer.concat(chunks);
+      if (!looksLikeImage(dest, data)) {
+        throw new Error(`decoded bytes are not a valid ${path.extname(dest)} file`);
+      }
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, data);
       hexDests.add(dest);
@@ -118,6 +136,9 @@ for (const root of roots) {
         .join("")
         .replace(/\s+/g, "");
       const data = Buffer.from(text, "base64");
+      if (!looksLikeImage(dest, data)) {
+        throw new Error(`decoded bytes are not a valid ${path.extname(dest)} file`);
+      }
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, data);
       count += 1;
