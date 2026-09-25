@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/server/session";
-import { SettingsPage } from "@/components/settings/SettingsPage";
 
-export default async function Settings() {
-  const user = await getSessionUser();
-  if (!user) redirect("/login");
-  return <SettingsPage />;
+export default async function Settings({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const raw = ((await searchParams).tab || "providers").toLowerCase();
+  const tab = raw === "connectors" ? "mcp" : raw;
+  redirect(`/jarvis/settings?tab=${encodeURIComponent(tab)}`);
 }
