@@ -184,6 +184,11 @@ export function removeCustomConnector(name: string): CustomConnector[] {
 }
 
 export function skillsDir(): string {
+  return path.join(dataDir(), "skills");
+}
+
+/** Skills checked into the repo (survive deploys). */
+export function repoSkillsDir(): string {
   return path.join(process.cwd(), "skills");
 }
 
