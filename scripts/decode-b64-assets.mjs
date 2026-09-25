@@ -88,6 +88,24 @@ function looksLikeImage(dest, data) {
   return png || jpg || ico || webp || pdf;
 }
 
+const rootUploads = [
+  { from: "profile.png", to: "public/profile.png" },
+  { from: "orbit-command-center.png", to: "public/orbit-command-center.png" },
+  { from: "orbitcommandcenter.png", to: "public/orbit-command-center.png" },
+  { from: "Orbit-Command- Center.png", to: "public/orbit-command-center.png" },
+];
+for (const { from, to } of rootUploads) {
+  if (!fs.existsSync(from)) continue;
+  const data = fs.readFileSync(from);
+  if (!looksLikeImage(to, data)) {
+    console.warn(`skip root upload ${from}: not a valid image`);
+    continue;
+  }
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  fs.writeFileSync(to, data);
+  console.log(`copied ${from} -> ${to} (${data.length} bytes)`);
+}
+
 const roots = ["public", "assets", "brain", "src"];
 let count = 0;
 const hexDests = new Set();
@@ -97,6 +115,10 @@ for (const root of roots) {
   const groups = groupByPrefix(files, /^(.*\.hex)(?:\.part(\d+)([a-z])?)?$/);
   for (const [hexPath, parts] of groups) {
     const dest = hexPath.slice(0, -4);
+    if (dest.endsWith("favicon.ico")) {
+      console.log(`skip sidecar for ${dest}`);
+      continue;
+    }
     const existing = fs.existsSync(dest) ? fs.statSync(dest).size : 0;
     if (existing > 512) {
       hexDests.add(dest);
@@ -125,6 +147,10 @@ for (const root of roots) {
   const groups = groupByPrefix(walk(root), /^(.*\.b64)(?:\.part(\d+)([a-z])?)?$/);
   for (const [b64Path, parts] of groups) {
     const dest = b64Path.slice(0, -4);
+    if (dest.endsWith("favicon.ico")) {
+      console.log(`skip sidecar for ${dest}`);
+      continue;
+    }
     if (hexDests.has(dest)) {
       console.log(`skip b64 for ${dest} (hex sidecar present)`);
       continue;
