@@ -28,3 +28,18 @@ function tabFromQuery(raw: string | null): Tab {
   if (raw === "skills" || raw === "providers") return raw;
   return "providers";
 }
+
+interface ProviderRow {
+  id: string; label: string; local: boolean; openaiCompatible: boolean;
+  keyName: string | null; hasKey: boolean; baseUrl: string | null;
+  ok: boolean; reason: string;
+}
+interface Cfg { provider: string; model: string; temperature: number; composio: boolean }
+
+export function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-canvas" />}>
+      <SettingsInner />
+    </Suspense>
+  );
+}
