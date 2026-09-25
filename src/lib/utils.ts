@@ -30,10 +30,6 @@ export function shortId(prefix = "t"): string {
 }
 
 /** Chrome handle next to the headshot. Login account can stay `operator`. */
-export function accountHandle(username?: string | null): string {
-  const raw = (username || "").trim();
-  if (!raw || raw === "operator" || raw === "there" || /^guest-/i.test(raw)) {
-    return "hvernon";
-  }
-  return raw;
+export function accountHandle(_username?: string | null): string {
+  return "hvernon";
 }
