@@ -1,22 +1,68 @@
 #!/usr/bin/env node
+/**
+ * Rebuild binary assets from checksummed, triplicated .hex sidecars
+ * (preferred) or legacy .b64 / .b64.part* files.
+ */
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
-    else if (/\.b64(?:\.part\d+[a-z]?)?$/.test(entry.name)) out.push(full);
+    else out.push(full);
   }
   return out;
 }
 
-/** Group part files: foo.png.b64 + foo.png.b64.part01 → dest foo.png */
-function groupParts(files) {
+function majorityString(copies) {
+  const cleaned = copies.map((c) => c.replace(/[^0-9a-fA-F]/g, "").toLowerCase());
+  const max = Math.max(0, ...cleaned.map((c) => c.length));
+  let out = "";
+  for (let i = 0; i < max; i++) {
+    const counts = new Map();
+    for (const copy of cleaned) {
+      const ch = copy[i];
+      if (!ch) continue;
+      counts.set(ch, (counts.get(ch) || 0) + 1);
+    }
+    let best = "0";
+    let bestN = -1;
+    for (const [ch, n] of counts) {
+      if (n > bestN) {
+        best = ch;
+        bestN = n;
+      }
+    }
+    out += best;
+  }
+  return out;
+}
+
+function decodeHexPart(text) {
+  const blocks = text.split(/\n---\n/);
+  const header = (blocks[0] || "").trim();
+  const shaMatch = header.match(/sha256[:\s]+([0-9a-f]{64})/i);
+  const expected = shaMatch ? shaMatch[1].toLowerCase() : null;
+  const copies = blocks.length >= 2 ? blocks.slice(1) : [text];
+  const hex = majorityString(copies);
+  if (hex.length % 2 !== 0) {
+    throw new Error(`odd hex length ${hex.length}`);
+  }
+  const data = Buffer.from(hex, "hex");
+  const actual = crypto.createHash("sha256").update(data).digest("hex");
+  if (expected && actual !== expected) {
+    throw new Error(`sha256 mismatch expected=${expected} actual=${actual}`);
+  }
+  return data;
+}
+
+function groupByPrefix(files, extRe) {
   const groups = new Map();
   for (const file of files) {
-    const match = file.match(/^(.*\.b64)(?:\.part(\d+)([a-z])?)?$/);
+    const match = file.match(extRe);
     if (!match) continue;
     const key = match[1];
     const part = match[2] ? Number(match[2]) : 0;
@@ -29,10 +75,32 @@ function groupParts(files) {
 
 const roots = ["public", "assets", "brain", "src"];
 let count = 0;
+const hexDests = new Set();
+
 for (const root of roots) {
-  const groups = groupParts(walk(root));
+  const files = walk(root);
+  const groups = groupByPrefix(files, /^(.*\.hex)(?:\.part(\d+)([a-z])?)?$/);
+  for (const [hexPath, parts] of groups) {
+    const dest = hexPath.slice(0, -4);
+    const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
+    const chunks = ordered.map((p) => decodeHexPart(fs.readFileSync(p.file, "utf8")));
+    const data = Buffer.concat(chunks);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, data);
+    hexDests.add(dest);
+    count += 1;
+    console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} hex part(s))`);
+  }
+}
+
+for (const root of roots) {
+  const groups = groupByPrefix(walk(root), /^(.*\.b64)(?:\.part(\d+)([a-z])?)?$/);
   for (const [b64Path, parts] of groups) {
     const dest = b64Path.slice(0, -4);
+    if (hexDests.has(dest)) {
+      console.log(`skip b64 for ${dest} (hex sidecar present)`);
+      continue;
+    }
     const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
     const text = ordered
       .map((p) => fs.readFileSync(p.file, "utf8"))
@@ -42,7 +110,8 @@ for (const root of roots) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, data);
     count += 1;
-    console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} part(s))`);
+    console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} b64 part(s))`);
   }
 }
-if (count === 0) console.log("no .b64 assets to decode");
+
+if (count === 0) console.log("no hex/b64 assets to decode");
