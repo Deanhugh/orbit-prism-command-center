@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { GITHUB_SKILLS_REPO, loadSkills, slugifySkillName, writeUploadedSkill } from "@/lib/server/skills";
