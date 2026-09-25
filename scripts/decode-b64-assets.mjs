@@ -6,6 +6,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { knockOutLockup } from "./knockout-lockup.mjs";
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -159,7 +160,7 @@ for (const root of roots) {
       const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
       const text = ordered
         .map((p) => fs.readFileSync(p.file, "utf8"))
-        .join("")
+               .join("")
         .replace(/\s+/g, "");
       const data = Buffer.from(text, "base64");
       if (!looksLikeImage(dest, data)) {
@@ -176,3 +177,9 @@ for (const root of roots) {
 }
 
 if (count === 0) console.log("no hex/b64 assets to decode");
+
+try {
+  knockOutLockup("public/orbit-command-center.png");
+} catch (err) {
+  console.warn(`skip lockup knockout: ${err.message}`);
+}
