@@ -1,1 +1,1 @@
-FILE_CONTENT_FROM_DISK
+PLACEHOLDER_LOAD_FROM_/tmp/settings-page-mcp-args.json
