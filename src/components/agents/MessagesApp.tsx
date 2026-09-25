@@ -18,8 +18,9 @@ import { Brand } from "@/components/chrome/Brand";
 import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
 import { ComposerPlus } from "@/components/agents/ComposerPlus";
 import { OfficeSafe } from "@/components/agents/OfficeSafe";
-import { cn, timeAgo } from "@/lib/utils";
+import { accountHandle, cn, timeAgo } from "@/lib/utils";
 
+// The animated 3D office scene (client-only), embedded compactly under the agents list.
 const OfficeScene = dynamic(() => import("@/components/office/OfficeCanvas"), {
   ssr: false,
   loading: () => (
@@ -40,9 +41,9 @@ interface Pref { provider: string; model: string; mode: ChatMode; skill: string 
 interface SkillInfo { name: string; description?: string; department: string | null; agents: string[] }
 
 const STATUS_COLOR: Record<StatusTone, string> = {
-  working: "#35b26a",
-  ending: "#e0a72e",
-  offline: "#d64550",
+  working: "#35b26a", // green
+  ending: "#e0a72e", // yellow
+  offline: "#d64550", // red
 };
 const STATUS_LABEL: Record<StatusTone, string> = {
   working: "Working",
@@ -60,6 +61,11 @@ function hashStr(s: string): number {
   return Math.abs(h);
 }
 
+/**
+ * Derive a green/yellow/red shift status per agent from live runtime signals
+ * (circuit-breaker + budget + active tasks). Idle agents get a stable
+ * deterministic status so the panel shows a realistic mix rather than all-green.
+ */
 function deriveStatuses(rt: AgentRuntimeInfo[], tasks: Task[]): Record<string, AgentStatus> {
   const byId = new Map(rt.map((r) => [r.id, r]));
   const active = new Set(tasks.filter((t) => t.status === "in_progress").map((t) => t.agentId));
@@ -110,6 +116,8 @@ export function MessagesApp({ username }: { username: string }) {
 
   const active = convs.find((c) => c.id === activeId);
 
+  // Fetch a provider's model list on demand (once per provider); state only
+  // updates after the fetch resolves.
   const ensureModels = useCallback((provider: string) => {
     if (!provider || loadedModels.current.has(provider)) return;
     loadedModels.current.add(provider);
@@ -119,6 +127,8 @@ export function MessagesApp({ username }: { username: string }) {
       .catch(() => { loadedModels.current.delete(provider); });
   }, []);
 
+  // The model / mode / skill chosen for the currently-open agent (falls back to
+  // the global default). Each agent remembers its own choices.
   const current: Pref = prefs[activeId] || { provider: cfg?.provider || "demo", model: cfg?.model || "", mode: "chat", skill: "" };
 
   useEffect(() => { ensureModels(current.provider); }, [current.provider, ensureModels]);
@@ -156,6 +166,8 @@ export function MessagesApp({ username }: { username: string }) {
     return rows;
   }, [providers, modelsByProvider, current.model, current.provider]);
 
+  // Skills available to the currently-open agent/department. The skills API
+  // returns agent *names*, so match on the conversation's agent name or its dept.
   const activeAgentId = active && active.kind === "dm" ? active.agentIds[0] : undefined;
   const activeAgentName = active && active.kind === "dm" && activeAgentId !== "jarvis" ? active.title : undefined;
   const activeDeptId = active?.deptId;
@@ -177,10 +189,12 @@ export function MessagesApp({ username }: { username: string }) {
     }).catch(() => {});
   }, [ensureModels]);
 
+  // Persist per-agent choices locally.
   useEffect(() => {
     try { localStorage.setItem("orbit_agent_prefs", JSON.stringify(prefs)); } catch { /* ignore */ }
   }, [prefs]);
 
+  // Load skills once for the Skill picker / insert menu.
   useEffect(() => {
     fetch("/api/settings/skills").then((r) => r.json()).then((d) => setAllSkills(d.skills || [])).catch(() => {});
   }, []);
@@ -218,6 +232,7 @@ export function MessagesApp({ username }: { username: string }) {
   const toggleDept = (deptId: string) =>
     setExpanded((e) => ({ ...e, [deptId]: !isOpen(deptId) }));
 
+  // Task mode: dispatch the message as real work through the task engine.
   async function dispatchTask(text: string) {
     if (!active) return;
     setBusy(true);
@@ -237,8 +252,8 @@ export function MessagesApp({ username }: { username: string }) {
         const d = await res.json();
         const who = d.task?.agentName || active.title;
         note = d.routine
-          ? `Scheduled routine created for ${active.title}.`
-          : `Task dispatched to ${who} — it's running now. Watch the office scene light up; the result files to the Brain.`;
+          ? `⟲ Scheduled routine created for ${active.title}.`
+          : `✅ Task dispatched to ${who} — it's running now. Watch the office scene light up; the result files to the Brain.`;
       }
       setMessages((m) => [...m, { id: "a" + Date.now(), role: "assistant", content: note, ts: Date.now(), agentName: active.title }]);
     } catch {
@@ -295,6 +310,7 @@ export function MessagesApp({ username }: { username: string }) {
       }
       if (doneMsg) setMessages((m) => [...m, doneMsg!]);
       setDraft(null);
+      // refresh sidebar previews
       fetch("/api/agents/conversations").then((r) => r.json()).then((d) => setConvs(d.conversations || [])).catch(() => {});
     } catch {
       setDraft(null);
@@ -307,6 +323,7 @@ export function MessagesApp({ username }: { username: string }) {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-y-auto bg-canvas text-ink lg:flex-row lg:overflow-hidden">
+      {/* left: Agents list (top) + animated Office scene (bottom) */}
       <aside className="flex h-[80vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[480px] lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-2 px-4 py-3">
           <Brand />
@@ -319,6 +336,7 @@ export function MessagesApp({ username }: { username: string }) {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-full rounded-lg border border-line bg-canvas px-3 py-1.5 text-[12px] outline-none placeholder:text-ink-soft/60" />
         </div>
         <div className="thin-scroll flex-1 overflow-y-auto px-2">
+          {/* Chief (Jarvis) pinned at the top */}
           {jarvisConv && (!q || "chief".includes(q) || jarvisConv.subtitle.toLowerCase().includes(q)) && (
             <button
               onClick={() => setActiveId(jarvisConv.id)}
@@ -331,6 +349,8 @@ export function MessagesApp({ username }: { username: string }) {
               </span>
             </button>
           )}
+
+          {/* Departments — collapsible, each revealing its agents with a status */}
           {sections.map(({ dept, group, agents }) => {
             const open = isOpen(dept.id);
             return (
@@ -353,6 +373,7 @@ export function MessagesApp({ username }: { username: string }) {
                     </span>
                   )}
                 </button>
+
                 {open && (
                   <div className="mb-1 ml-3 border-l border-line pl-1">
                     {group && (
@@ -391,6 +412,8 @@ export function MessagesApp({ username }: { username: string }) {
             );
           })}
         </div>
+
+        {/* status legend */}
         <div className="flex items-center gap-3 border-t border-line px-4 py-1.5 text-[9px] text-ink-soft">
           {(["working", "ending", "offline"] as StatusTone[]).map((tone) => (
             <span key={tone} className="flex items-center gap-1">
@@ -399,6 +422,7 @@ export function MessagesApp({ username }: { username: string }) {
             </span>
           ))}
         </div>
+        {/* animated Office scene — under the agents panel (bottom-left) */}
         <div className="relative h-[380px] shrink-0 overflow-hidden border-t border-line">
           <OfficeSafe>
             <OfficeScene zoom={22} />
@@ -410,6 +434,7 @@ export function MessagesApp({ username }: { username: string }) {
             Click a pod to focus a department
           </span>
         </div>
+
         <div className="border-t border-line px-2 py-2">
           <Link
             href="/jarvis/settings"
@@ -420,12 +445,13 @@ export function MessagesApp({ username }: { username: string }) {
             Settings
           </Link>
           <div className="mt-2 flex items-center gap-2.5 rounded-lg px-2 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={avatarUrl}
               alt=""
               className="h-8 w-8 shrink-0 rounded-full object-cover"
             />
-            <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">{username}</span>
+            <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-ink">{accountHandle(username)}</span>
             <button
               type="button"
               onClick={logout}
@@ -436,6 +462,8 @@ export function MessagesApp({ username }: { username: string }) {
           </div>
         </div>
       </aside>
+
+      {/* right: chat */}
       <main className="flex min-h-[80vh] w-full min-w-0 flex-1 flex-col lg:min-h-0">
         <header className="flex items-center justify-between border-b border-line px-5 py-3">
           <div className="flex items-center gap-2">
@@ -447,6 +475,7 @@ export function MessagesApp({ username }: { username: string }) {
             <HeaderControls />
           </div>
         </header>
+
         <div className="thin-scroll flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {messages.length === 0 && !draft && (
             <div className="mt-16 text-center text-[12px] text-ink-soft">
@@ -458,6 +487,8 @@ export function MessagesApp({ username }: { username: string }) {
           {draft && <DraftRow content={draft.content} agentName={draft.agentName} tools={draft.tools} accent={active?.accent || "#888"} />}
           <div ref={endRef} />
         </div>
+
+        {/* composer — Cursor-style: insert menu, Mode / Skill / Model, mic */}
         <div className="relative z-30 overflow-visible border-t border-line px-5 py-3">
           <div className="overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
             <div className="flex items-end gap-2 overflow-visible">
@@ -487,6 +518,7 @@ export function MessagesApp({ username }: { username: string }) {
                   }
                 }}
               />
+
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -495,6 +527,7 @@ export function MessagesApp({ username }: { username: string }) {
                 placeholder="Send a message…"
                 className="max-h-32 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[13px] outline-none placeholder:text-ink-soft/60"
               />
+
               {voiceSupported && (
                 <button
                   onMouseDown={start}
@@ -514,6 +547,7 @@ export function MessagesApp({ username }: { username: string }) {
                 <ArrowUp size={16} />
               </button>
             </div>
+
             {attachments.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1 px-1">
                 {attachments.map((name) => (
@@ -549,6 +583,8 @@ export function MessagesApp({ username }: { username: string }) {
           </div>
         </div>
       </main>
+
+      {/* Brain graph modal (opened from the Tasks panel's Brain card) */}
       <BrainGraphOverlay />
     </div>
   );
@@ -635,6 +671,21 @@ function ModelPicker({
   );
 }
 
+function Pill({ label, value, onChange, options, title }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; title?: string }) {
+  return (
+    <label title={title} className="flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] text-ink-soft hover:border-ink-soft">
+      {label && <span className="font-semibold uppercase tracking-wide">{label}</span>}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="max-w-[150px] cursor-pointer bg-transparent text-[10px] font-medium text-ink outline-none"
+      >
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </label>
+  );
+}
+
 function PresenceAvatar({ accent, text, tone, small }: { accent: string; text: string; tone: StatusTone; small?: boolean }) {
   const size = small ? "h-7 w-7" : "h-9 w-9";
   return (
@@ -656,10 +707,10 @@ function ToolChecklist({ tools }: { tools: ChatToolStep[] }) {
       {tools.map((t, i) => (
         <div key={i} className="flex items-center gap-2 text-[11px]">
           <span className={t.status === "done" ? "text-emails" : t.status === "error" ? "text-marketing" : "text-ink-soft"}>
-            {t.status === "done" ? "\u2713" : t.status === "error" ? "\u2715" : "\u22ef"}
+            {t.status === "done" ? "✓" : t.status === "error" ? "✕" : "⋯"}
           </span>
           <span className="font-medium text-ink">{t.name}</span>
-          {t.detail && <span className="truncate text-ink-soft">\u2192 {t.detail}</span>}
+          {t.detail && <span className="truncate text-ink-soft">→ {t.detail}</span>}
         </div>
       ))}
     </div>
@@ -695,7 +746,7 @@ function DraftRow({ content, agentName, tools, accent }: { content: string; agen
       </div>
       <ToolChecklist tools={tools} />
       <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-canvas-2 px-3.5 py-2 text-[13px] text-ink whitespace-pre-wrap">
-        {content || <span className="text-ink-soft">Drafting\u2026</span>}
+        {content || <span className="text-ink-soft">Drafting…</span>}
       </div>
     </div>
   );
