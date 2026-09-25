@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { DeptId } from "../types";
-import { brainDir, skillsDir } from "./config";
+import { brainDir, repoSkillsDir, skillsDir } from "./config";
 
 export interface Skill {
   name: string;
@@ -59,6 +59,7 @@ function parseFrontMatter(raw: string): {
 function skillRoots(): string[] {
   const brain = brainDir();
   return [
+    repoSkillsDir(),
     skillsDir(),
     path.join(brain, "skills"),
     path.join(brain, "Skills"),
