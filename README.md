@@ -1,11 +1,46 @@
-# Orbit Prism Operating System
+# Orbit Prism Command Center
 
-A 3D isometric office where AI agents do real work on **your** models — recommended: **Ollama**
-(local on a Mac mini, plus Ollama Cloud for larger models).
+Jarvis / Command Center for Orbit Prism. Live:
 
-Six departments around a central **Brain**, a chat that routes what you ask to the right agent,
-MCP/CLI connectors you add from Settings, a Markdown Brain you can open as a graph, per-agent
-skills, and routines that run on a clock. Message an agent (or Chief), the office gives the work to
-the right agent, they read your notes, use the connectors you've set up, do the work, and file the
-result back into your notes. There are also live platform integrations per department — Sales
-(Twenty), Finance (Bigcapital), PMO (Plane), Marketing (TryPost), and Email (Mautic).
+https://command-center-production-e72e.up.railway.app/
+
+Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://127.0.0.1:43140 — default port is `43140`.
+
+## Skills
+
+Skills are markdown playbooks (`skills/<name>/SKILL.md`), not Ollama models. Ollama (or Claude / ChatGPT) is the brain. A skill is the written method an agent should follow.
+
+Two ways to add one:
+
+1. **Upload** from Command Center → Settings → Skills. Drop a `SKILL.md`. It applies immediately and persists on the host (`DATA_DIR/skills`).
+2. **GitHub** — add `skills/<name>/SKILL.md` on [the skills folder](https://github.com/Deanhugh/orbit-prism-command-center/tree/main/skills). That file ships on the next Railway deploy and shows a GitHub badge.
+
+Front matter:
+
+```markdown
+---
+name: inbox-triage
+description: How the inbox is triaged each morning
+agents: [em_lead, em_client]
+department: emails
+---
+```
+
+See `skills/README.md`.
+
+## Settings
+
+Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar.
+
+## Deploy
+
+Railway auto-deploys from GitHub `main`. Persistent uploads use the `orbit-data` volume at `/app/data`.
