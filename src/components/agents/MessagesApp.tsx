@@ -328,7 +328,7 @@ export function MessagesApp({ username }: { username: string }) {
         <div className="flex items-center gap-2 px-4 py-3">
           <Brand />
           <PageNav pairOnly />
-          <Link href="/settings" className="ml-auto grid h-6 w-6 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
+          <Link href="/jarvis/settings?tab=mcp" className="ml-auto grid h-6 w-6 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
             <Plus size={13} />
           </Link>
         </div>
