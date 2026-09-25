@@ -10,7 +10,6 @@ import {
   MessageCircle,
   Palette,
   Plug,
-  Puzzle,
   Save,
   Settings2,
   UserRound,
@@ -20,7 +19,7 @@ import { useJarvisHub } from "../useJarvisHub";
 import type { JarvisHub, JarvisProfile } from "@/lib/jarvis-data";
 import { SETTINGS_TABS, settingsHref, type SettingsTab } from "@/lib/jarvis-settings";
 import { AccountPanel, AppearancePanel, CrmPanel, GreetingsPanel } from "./SettingsPanels";
-import { Connectors, Plugins, Providers, Skills } from "@/components/settings/SettingsPage";
+import { Connectors, Providers, Skills } from "@/components/settings/SettingsPage";
 import { defaultAppearance } from "@/lib/jarvis-appearance";
 import { defaultCrmTaxonomy, defaultGreetings } from "@/lib/jarvis-data";
 
@@ -31,7 +30,6 @@ const TAB_ICON: Record<SettingsTab, typeof Settings2> = {
   Providers: KeyRound,
   MCP: Plug,
   Skills: BookOpen,
-  Plugins: Puzzle,
   "Social CRM": Handshake,
   Greetings: MessageCircle,
   Sidecar: Building2,
@@ -166,11 +164,6 @@ export function JarvisSettingsApp({
         {tab === "Skills" ? (
           <div className="mx-auto max-w-[900px]">
             <Skills />
-          </div>
-        ) : null}
-        {tab === "Plugins" ? (
-          <div className="mx-auto max-w-[900px]">
-            <Plugins />
           </div>
         ) : null}
         {tab === "Social CRM" ? (
