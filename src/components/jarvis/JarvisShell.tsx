@@ -16,11 +16,12 @@ import {
   ChevronLeft,
   ChevronRight,
   PanelLeftOpen,
+  LogOut,
   Settings,
   Users,
   Video,
 } from "lucide-react";
-import { cn, formatClock } from "@/lib/utils";
+import { accountHandle, cn, formatClock } from "@/lib/utils";
 import { APP_HOME } from "@/lib/home";
 import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
 import { applyAppearance, defaultAppearance } from "@/lib/jarvis-appearance";
@@ -125,6 +126,7 @@ export function JarvisShell({
           username={username}
           avatarUrl={hub?.profile.logoUrl || "/profile.png"}
           onToggle={toggleSidebar}
+          onLogout={logout}
         />
       </aside>
 
@@ -143,6 +145,7 @@ export function JarvisShell({
               avatarUrl={hub?.profile.logoUrl || "/profile.png"}
               onToggle={() => setMobileNav(false)}
               onNavigate={() => setMobileNav(false)}
+              onLogout={logout}
             />
           </aside>
         </div>
@@ -162,13 +165,6 @@ export function JarvisShell({
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="serif tabular-nums text-[13px] font-semibold text-cyan">{clock}</span>
-            <button
-              type="button"
-              onClick={logout}
-              className="hidden rounded-full border border-line px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink sm:inline"
-            >
-              Sign out
-            </button>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto thin-scroll">{children}</main>
@@ -184,6 +180,7 @@ function SidebarBody({
   avatarUrl,
   onToggle,
   onNavigate,
+  onLogout,
 }: {
   open: boolean;
   pathname: string;
@@ -191,7 +188,9 @@ function SidebarBody({
   avatarUrl: string;
   onToggle: () => void;
   onNavigate?: () => void;
+  onLogout: () => void;
 }) {
+  const handle = accountHandle(username);
   return (
     <>
       <div className={cn("flex flex-col border-b border-line", open ? "items-stretch px-3 py-4" : "items-center px-1 py-3")}>
@@ -276,25 +275,43 @@ function SidebarBody({
           open={open}
           onNavigate={onNavigate}
         />
-        <a
-          href="/jarvis/settings"
-          onClick={onNavigate}
-          title={username}
+        <div
           className={cn(
-            "mt-2 flex items-center gap-2.5 rounded-lg px-2 py-2 text-ink-soft hover:bg-panel-2 hover:text-ink",
-            !open && "justify-center",
+            "mt-2 flex items-center gap-2 rounded-lg px-2 py-2",
+            !open && "flex-col justify-center",
           )}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={avatarUrl}
-            alt=""
-            className="h-8 w-8 shrink-0 rounded-full object-cover"
-          />
-          {open ? (
-            <span className="min-w-0 truncate text-[12px] font-medium text-ink">{username}</span>
-          ) : null}
-        </a>
+          <a
+            href="/jarvis/settings"
+            onClick={onNavigate}
+            title={handle}
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2.5 text-ink-soft hover:text-ink",
+              !open && "justify-center",
+            )}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-8 w-8 shrink-0 rounded-full object-cover"
+            />
+            {open ? (
+              <span className="min-w-0 truncate text-[12px] font-medium text-ink">{handle}</span>
+            ) : null}
+          </a>
+          <button
+            type="button"
+            onClick={onLogout}
+            title="Sign out"
+            className={cn(
+              "shrink-0 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink",
+              !open && "grid h-8 w-8 place-items-center rounded-md hover:bg-panel",
+            )}
+          >
+            {open ? "Sign out" : <LogOut size={14} />}
+          </button>
+        </div>
       </div>
     </>
   );
