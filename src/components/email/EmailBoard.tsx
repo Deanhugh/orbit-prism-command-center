@@ -170,7 +170,7 @@ export function EmailBoard() {
         <p className="mt-4 text-[10px] text-ink-soft">
           Emails, campaigns &amp; contacts live in{" "}
           <a href="https://github.com/mautic/mautic" className="underline" target="_blank" rel="noreferrer">Mautic</a>.
-          The Email Marketing agent drafts and sends these same emails when they run tasks.
+          The Email Marketing agent drafts and sends these same emails when it runs tasks.
           Connect your instance under Settings → Connectors → Email; until then this uses local mock data.
         </p>
       </div>
@@ -195,7 +195,7 @@ function PlatformEmbed({ appUrl, live, onViewBoard }: { appUrl?: string; live?: 
           </p>
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
             <button onClick={onViewBoard} className="rounded-md bg-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-canvas">View the Board →</button>
-            <a href="/settings" className="rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft hover:text-ink">Connect in Settings</a>
+            <a href="/jarvis/settings?tab=mcp" className="rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-soft hover:text-ink">Connect in Settings</a>
             {src && <a href={src} target="_blank" rel="noreferrer" className="rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ops hover:bg-canvas-2">Open in Mautic ↗</a>}
           </div>
         </div>
