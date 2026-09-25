@@ -82,14 +82,24 @@ for (const root of roots) {
   const groups = groupByPrefix(files, /^(.*\.hex)(?:\.part(\d+)([a-z])?)?$/);
   for (const [hexPath, parts] of groups) {
     const dest = hexPath.slice(0, -4);
-    const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
-    const chunks = ordered.map((p) => decodeHexPart(fs.readFileSync(p.file, "utf8")));
-    const data = Buffer.concat(chunks);
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.writeFileSync(dest, data);
-    hexDests.add(dest);
-    count += 1;
-    console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} hex part(s))`);
+    const existing = fs.existsSync(dest) ? fs.statSync(dest).size : 0;
+    if (existing > 512) {
+      hexDests.add(dest);
+      console.log(`keep existing ${dest} (${existing} bytes; skip hex)`);
+      continue;
+    }
+    try {
+      const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
+      const chunks = ordered.map((p) => decodeHexPart(fs.readFileSync(p.file, "utf8")));
+      const data = Buffer.concat(chunks);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, data);
+      hexDests.add(dest);
+      count += 1;
+      console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} hex part(s))`);
+    } catch (err) {
+      console.warn(`skip hex for ${dest}: ${err.message}`);
+    }
   }
 }
 
@@ -101,16 +111,20 @@ for (const root of roots) {
       console.log(`skip b64 for ${dest} (hex sidecar present)`);
       continue;
     }
-    const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
-    const text = ordered
-      .map((p) => fs.readFileSync(p.file, "utf8"))
-      .join("")
-      .replace(/\s+/g, "");
-    const data = Buffer.from(text, "base64");
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.writeFileSync(dest, data);
-    count += 1;
-    console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} b64 part(s))`);
+    try {
+      const ordered = parts.sort((a, b) => a.part - b.part || a.sub.localeCompare(b.sub));
+      const text = ordered
+        .map((p) => fs.readFileSync(p.file, "utf8"))
+        .join("")
+        .replace(/\s+/g, "");
+      const data = Buffer.from(text, "base64");
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, data);
+      count += 1;
+      console.log(`decoded ${dest} (${data.length} bytes from ${ordered.length} b64 part(s))`);
+    } catch (err) {
+      console.warn(`skip b64 for ${dest}: ${err.message}`);
+    }
   }
 }
 
