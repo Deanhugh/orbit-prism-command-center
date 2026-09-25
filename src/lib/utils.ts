@@ -28,3 +28,12 @@ export function formatClock(d = new Date()): string {
 export function shortId(prefix = "t"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 }
+
+/** Chrome handle next to the headshot. Login account can stay `operator`. */
+export function accountHandle(username?: string | null): string {
+  const raw = (username || "").trim();
+  if (!raw || raw === "operator" || raw === "there" || /^guest-/i.test(raw)) {
+    return "hvernon";
+  }
+  return raw;
+}
