@@ -31,7 +31,7 @@ department: emails
 
 - `name` — slug shown in Settings
 - `description` — one-line summary
-- `agents` — agent ids from the office, or `all`
-- `department` — department id, or `all`
+- `agents` — agent ids from the office (`jarvis` / `chief` for the Chief of Staff), or `all`
+- `department` — department id, or `all` (Jarvis also receives `department: all`)
 
 Checked-in examples: `inbox-triage`, `client-report`, `proposal`.
