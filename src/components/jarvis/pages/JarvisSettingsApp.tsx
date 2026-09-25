@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
+  BookOpen,
   Building2,
   Handshake,
+  KeyRound,
   MessageCircle,
   Palette,
+  Plug,
+  Puzzle,
   Save,
   Settings2,
   UserRound,
@@ -16,6 +20,7 @@ import { useJarvisHub } from "../useJarvisHub";
 import type { JarvisHub, JarvisProfile } from "@/lib/jarvis-data";
 import { SETTINGS_TABS, settingsHref, type SettingsTab } from "@/lib/jarvis-settings";
 import { AccountPanel, AppearancePanel, CrmPanel, GreetingsPanel } from "./SettingsPanels";
+import { Connectors, Plugins, Providers, Skills } from "@/components/settings/SettingsPage";
 import { defaultAppearance } from "@/lib/jarvis-appearance";
 import { defaultCrmTaxonomy, defaultGreetings } from "@/lib/jarvis-data";
 
@@ -23,6 +28,10 @@ const TAB_ICON: Record<SettingsTab, typeof Settings2> = {
   General: Settings2,
   Appearance: Palette,
   Account: UserRound,
+  Providers: KeyRound,
+  MCP: Plug,
+  Skills: BookOpen,
+  Plugins: Puzzle,
   "Social CRM": Handshake,
   Greetings: MessageCircle,
   Sidecar: Building2,
@@ -46,6 +55,12 @@ export function JarvisSettingsApp({
   useEffect(() => {
     if (hub) setForm(hub.profile);
   }, [hub]);
+
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" }));
+  }, [tab]);
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -136,11 +151,26 @@ export function JarvisSettingsApp({
               on this machine — not your Mac login.
             </p>
             <AccountPanel guest={username.startsWith("guest-")} />
-            <p className="mx-auto max-w-2xl">
-              <Link href="/settings" className="text-[13px] underline underline-offset-2">
-                Open provider, MCP, and skill settings
-              </Link>
-            </p>
+          </div>
+        ) : null}
+        {tab === "Providers" ? (
+          <div className="mx-auto max-w-[900px]">
+            <Providers />
+          </div>
+        ) : null}
+        {tab === "MCP" ? (
+          <div className="mx-auto max-w-[900px]">
+            <Connectors />
+          </div>
+        ) : null}
+        {tab === "Skills" ? (
+          <div className="mx-auto max-w-[900px]">
+            <Skills />
+          </div>
+        ) : null}
+        {tab === "Plugins" ? (
+          <div className="mx-auto max-w-[900px]">
+            <Plugins />
           </div>
         ) : null}
         {tab === "Social CRM" ? (
