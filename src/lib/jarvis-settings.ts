@@ -5,7 +5,6 @@ export const SETTINGS_TABS = [
   "Providers",
   "MCP",
   "Skills",
-  "Plugins",
   "Social CRM",
   "Greetings",
   "Sidecar",
@@ -20,7 +19,6 @@ export const SETTINGS_SLUG: Record<SettingsTab, string> = {
   Providers: "providers",
   MCP: "mcp",
   Skills: "skills",
-  Plugins: "plugins",
   "Social CRM": "social-crm",
   Greetings: "greetings",
   Sidecar: "sidecar",
@@ -34,6 +32,7 @@ export function settingsTabFromQuery(raw?: string | null): SettingsTab {
   const key = (raw || "general").toLowerCase().replace(/[\s_]+/g, "-");
   const compact = key.replace(/-/g, "");
   if (key === "connectors") return "MCP";
+  if (key === "plugins") return "Skills";
   return (
     SETTINGS_TABS.find((t) => SETTINGS_SLUG[t] === key) ||
     SETTINGS_TABS.find((t) => t.toLowerCase().replace(/\s+/g, "") === compact) ||
