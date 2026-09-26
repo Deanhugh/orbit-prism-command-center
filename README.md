@@ -132,15 +132,14 @@ These are separate Railway projects. Command Center talks to them over HTTP with
 
 Sign into Twenty, then open `/sales`. The board is **live** (not mock) when those three variables are set and `/api/crm/config` reports `reachable: true`. Create or rotate the key in Twenty → Settings → API & Webhooks (key name **Command Center**).
 
-### Plane — `/pmo` (app up, Command Center still mock until PAT)
+### Plane — `/pmo` (live)
 
-- App: https://plane-production-3665.up.railway.app
-- First-run: https://plane-production-3665.up.railway.app/god-mode/
-- Create workspace slug `orbit-prism`, then a Personal Access Token named **Command Center**
+- App: https://plane-production-3665.up.railway.app/orbit-prism/
+- Workspace slug: `orbit-prism`
 - Command Center vars: `PLANE_API_URL`, `PLANE_APP_URL`, `PLANE_WORKSPACE_SLUG`, `PLANE_API_KEY`
 - PMO board: https://command-center-production-e72e.up.railway.app/pmo
 
-Until those four variables are set, `/pmo` uses local mock projects.
+`/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
 ### TryPost — `/marketing` (blocked on image)
 
