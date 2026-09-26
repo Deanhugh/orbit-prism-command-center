@@ -132,13 +132,19 @@ These are separate Railway projects. Command Center talks to them over HTTP with
 
 Sign into Twenty, then open `/sales`. The board is **live** (not mock) when those three variables are set and `/api/crm/config` reports `reachable: true`. Create or rotate the key in Twenty → Settings → API & Webhooks (key name **Command Center**).
 
-### TryPost — `/marketing`
+### Plane — `/pmo` (app up, Command Center still mock until PAT)
 
-Self-hosted on Railway as **Orbit Prism TryPost**. Wire `TRYPOST_API_URL`, `TRYPOST_APP_URL`, and `TRYPOST_API_KEY` (workspace Bearer token from TryPost → Settings → API Keys). Until the key is set, `/marketing` uses local mock posts.
+- App: https://plane-production-3665.up.railway.app
+- First-run: https://plane-production-3665.up.railway.app/god-mode/
+- Create workspace slug `orbit-prism`, then a Personal Access Token named **Command Center**
+- Command Center vars: `PLANE_API_URL`, `PLANE_APP_URL`, `PLANE_WORKSPACE_SLUG`, `PLANE_API_KEY`
+- PMO board: https://command-center-production-e72e.up.railway.app/pmo
 
-### Plane — `/pmo`
+Until those four variables are set, `/pmo` uses local mock projects.
 
-Not deployed on Railway yet. Needs `PLANE_API_URL`, `PLANE_APP_URL`, `PLANE_WORKSPACE_SLUG`, and `PLANE_API_KEY`.
+### TryPost — `/marketing` (blocked on image)
+
+Railway project **Orbit Prism TryPost** exists (app + Postgres + Redis). `ghcr.io/trypostit/trypost:latest` and `v1.0.8` crash on boot (`Laravel\\Pail\\PailServiceProvider` not found). Leave `/marketing` on mock until a working image is published. Then set `TRYPOST_API_URL`, `TRYPOST_APP_URL`, `TRYPOST_API_KEY`.
 
 ## Deploy
 
