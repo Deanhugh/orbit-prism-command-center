@@ -117,8 +117,29 @@ Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staf
 
 ## Settings
 
-Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar.
+Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar. Department platforms (Twenty, Bigcapital, Plane, TryPost, Mautic) live under **Settings → MCP**.
+
+## Department platforms on Railway
+
+These are separate Railway projects. Command Center talks to them over HTTP with `*_API_URL` / `*_APP_URL` / `*_API_KEY` (or the Settings card). Do not bake the apps into the Command Center image.
+
+### Twenty CRM — `/sales` (live)
+
+- App: https://server-production-6c63.up.railway.app
+- Workspace: **Orbit Prism**
+- Command Center vars: `TWENTY_API_URL`, `TWENTY_APP_URL`, `TWENTY_API_KEY`
+- Sales board: https://command-center-production-e72e.up.railway.app/sales
+
+Sign into Twenty, then open `/sales`. The board is **live** (not mock) when those three variables are set and `/api/crm/config` reports `reachable: true`. Create or rotate the key in Twenty → Settings → API & Webhooks (key name **Command Center**).
+
+### TryPost — `/marketing`
+
+Self-hosted on Railway as **Orbit Prism TryPost**. Wire `TRYPOST_API_URL`, `TRYPOST_APP_URL`, and `TRYPOST_API_KEY` (workspace Bearer token from TryPost → Settings → API Keys). Until the key is set, `/marketing` uses local mock posts.
+
+### Plane — `/pmo`
+
+Not deployed on Railway yet. Needs `PLANE_API_URL`, `PLANE_APP_URL`, `PLANE_WORKSPACE_SLUG`, and `PLANE_API_KEY`.
 
 ## Deploy
 
-Railway auto-deploys from GitHub `main`. Persistent uploads use the `orbit-data` volume at `/app/data`.
+Railway auto-deploys Command Center from GitHub `main`. Persistent uploads use the `orbit-data` volume at `/app/data`.
