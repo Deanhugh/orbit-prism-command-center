@@ -28,6 +28,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   trypost: ["marketing"],
   mautic: ["marketing"],
   github: ["ops"],
+  cad: ["ops"],
 };
 
 const ALL_DEPTS: DeptId[] = [
@@ -105,6 +106,9 @@ function applyPolicy(list: Connector[]): Connector[] {
     // Same for email marketing (Mautic).
     if (conn.key === "mautic" && status !== "denied") {
       reason = emailLive ? "Mautic — live instance connected" : "Mautic — using local mock emails";
+    }
+    if (conn.key === "cad" && status !== "denied") {
+      reason = "Orbit CAD — text-to-part on /cad";
     }
     return {
       ...conn,

@@ -25,6 +25,7 @@ import {
   createWorkItem, listWorkItems, planeConfigured, pmSummary, updateWorkItem, type StateGroup,
 } from "./plane";
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
+import { buildCadModel } from "./cad";
 import {
   createEmail, emailSummary, listEmails, mauticConfigured, sendEmail,
 } from "./mautic";
@@ -145,6 +146,7 @@ function heuristicAgent(dept: DeptId, title: string): string {
     let score = 0;
     for (const term of t.split(/\W+/)) { if (term.length > 3 && hay.includes(term)) score += 1; }
     if (a.lead) score -= 0.5;
+    if (dept === "ops" && a.id === "op_comply" && /\b(cad|bracket|enclos|hilbert|flange|shaft|plate|housing|iot)\b/.test(t)) score += 3;
     if (score > bestScore) { bestScore = score; best = a; }
   }
   return best.id;
@@ -248,6 +250,10 @@ async function runTask(id: string) {
       const social = await socialForTask(task.title, agent.name);
       if (social) { deliverable += `\n\n---\n\n### Social (${trypostConfigured() ? "TryPost — live" : "TryPost — local"})\n${social}`; if (!usedTools.includes("trypost")) usedTools.unshift("trypost"); }
     }
+  }
+  if (task.dept === "ops" && agent.tools.includes("cad") && allowed.includes("cad")) {
+    const cad = await cadForTask(task.title, task.agentId);
+    if (cad) { deliverable += `\n\n---\n\n### CAD\n${cad}`; if (!usedTools.includes("cad")) usedTools.unshift("cad"); }
   }
   const notePath = writeDeliverable(task.agentName, task.title, deliverable, readTitles);
   spendBudget(task.agentId, 12 + Math.round(Math.random() * 10));
@@ -390,6 +396,19 @@ async function socialForTask(title: string, agentName: string): Promise<string |
     return [`Content calendar (${sum.activeChannels}/${sum.channels} channels active, ${sum.totalPosts} posts):`, ...lines, `- **Scheduled next 7 days:** ${sum.scheduledNext7}`].join("\n");
   } catch { return null; }
 }
+async function cadForTask(title: string, agentId: string): Promise<string | null> {
+  const t = title.toLowerCase();
+  if (!/\b(cad|step|bracket|enclos|housing|flange|shaft|hilbert|infill|3d|solid|mounting plate|mechanical part)\b/.test(t)) {
+    return null;
+  }
+  try {
+    const { model } = buildCadModel(title, agentId);
+    if (!model) return null;
+    return `Built **${model.title}** (${model.solids.length} solids) on [/cad](/cad). ${model.steps[0]?.text || ""}`;
+  } catch {
+    return null;
+  }
+}
 async function emailForTask(title: string): Promise<string | null> {
   const t = title.toLowerCase();
   try {
@@ -442,6 +461,7 @@ export function actOnTask(id: string, action: "approve" | "reject"): Task | null
 }
 function pickDept(text: string): DeptId {
   const t = text.toLowerCase();
+  if (/\b(cad|hilbert|bracket|enclosure|flange|step file|3d model)\b/.test(t)) return "ops";
   let best: DeptId = "ops"; let bestScore = -1;
   for (const d of DEPARTMENTS) {
     const hay = (d.name + " " + AGENTS_BY_DEPT[d.id].map((a) => a.role + " " + a.does).join(" ")).toLowerCase();
