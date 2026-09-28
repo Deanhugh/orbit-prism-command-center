@@ -23,6 +23,7 @@ import { useJarvisHub } from "./useJarvisHub";
 import { DeckFollowups } from "./DeckFollowups";
 import { DeckWork } from "./DeckWork";
 import { DeckKnowledge } from "./DeckKnowledge";
+import { TodayJarvis } from "./TodayJarvis";
 
 type TaskTab = "today" | "overdue" | "upcoming" | "all";
 
@@ -82,40 +83,18 @@ export function JarvisDashboard({
 
   return (
     <div className="grid min-h-full w-full grid-cols-1 gap-3 p-3 sm:p-4 lg:grid-cols-12 lg:gap-3">
-      <section className="hud-panel hud-glow relative min-h-[280px] overflow-hidden p-5 lg:col-span-5 lg:min-h-[340px]">
-        <div className="hud-scan absolute inset-0 opacity-40" />
-        <div className="relative">
-          <p className="hud-label flex items-center gap-2">
-            <span className="h-1.5 w-1.5 rounded-full bg-emails" />
-            Today · Jarvis
-          </p>
-          <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-ink-soft">
-            Good {greet}
-          </p>
-          <p className="serif mt-8 text-[56px] font-semibold leading-none tabular-nums sm:text-[64px]">
-            {formatClockHM(now)}
-          </p>
-          <p className="mt-4 text-[15px] text-ink">
-            {pickGreeting(hub?.greetings ?? [], owner.split(" ")[0] || owner)}
-          </p>
-          <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{jarvisLine}</p>
-          <div className="mt-8">
-            <p className="text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-              {new Date(now).toLocaleDateString("en-US", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
-            <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-line">
-              <div
-                className="h-full rounded-full bg-cyan"
-                style={{ width: `${Math.round(progress * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
+      <TodayJarvis
+        greet={greet}
+        clock={formatClockHM(now)}
+        greeting={pickGreeting(hub?.greetings ?? [], owner.split(" ")[0] || owner)}
+        jarvisLine={jarvisLine}
+        dateLabel={new Date(now).toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        })}
+        progress={progress}
+      />
 
       <section className="hud-panel flex min-h-[280px] flex-col p-4 lg:col-span-3 lg:min-h-[340px]">
         <div className="flex items-center justify-between gap-2">

@@ -3,7 +3,7 @@
 const BLOCKS = [
   {
     title: "Today · Jarvis",
-    body: "The first Command Center card is the day snapshot: clock, greeting, and what slipped or is due. It is not a chat. Agent conversation stays in the Agents office.",
+    body: "The first Command Center card is Jarvis himself: clock, greeting, and what slipped or is due. Talk to him in that box — type or hold the mic. Desk-level agent conversation still lives in the Agents office.",
     samples: [
       "What’s on my plate this morning?",
       "What slipped on the board?",
