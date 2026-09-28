@@ -178,13 +178,13 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
 
 export function resolveTodayPrompt(preset: string, text: string): { text: string; kind: "brief" | "chat" } {
   if (preset === "morning") {
-    return { text: "Give me the morning brief from the Command Center snapshot.", kind: "brief" };
+    return { text: "Morning brief.", kind: "brief" };
   }
   if (preset === "evening") {
-    return { text: "Give me the evening wrap from the Command Center snapshot.", kind: "brief" };
+    return { text: "Evening wrap.", kind: "brief" };
   }
   if (preset === "waiting") {
-    return { text: "Who is waiting on a reply?", kind: "chat" };
+    return { text: "Who is waiting?", kind: "chat" };
   }
   return { text: text.trim(), kind: "chat" };
 }

@@ -115,9 +115,6 @@ export function TodayJarvis({
         ? "speaking"
         : "idle";
 
-  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-  const spokenLine = lastAssistant?.content || jarvisLine;
-
   return (
     <section
       id="today-jarvis"
@@ -138,7 +135,7 @@ export function TodayJarvis({
               {clock}
             </p>
             <p className="mt-4 text-[15px] text-ink">{greeting}</p>
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{spokenLine}</p>
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">{jarvisLine}</p>
             <div className="mt-6">
               <p className="text-[10px] uppercase tracking-[0.16em] text-ink-soft">{dateLabel}</p>
               <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-line">
@@ -152,14 +149,14 @@ export function TodayJarvis({
           <JarvisCore mood={mood} />
         </div>
 
-        <div className="mt-4 min-h-[72px] max-h-[112px] flex-1 space-y-2 overflow-y-auto thin-scroll pr-1">
+        <div className="mt-4 min-h-[72px] max-h-[120px] flex-1 space-y-2 overflow-y-auto border-t border-line/70 pt-3 thin-scroll pr-1">
           {messages.length === 0 ? (
             <p className="text-[12px] text-ink-soft">
               Talk to Jarvis in this box — type, or hold the mic. Ask for the brief, who is waiting, or
               what is next.
             </p>
           ) : (
-            messages.slice(-8).map((line) => (
+            messages.slice(-6).map((line) => (
               <p
                 key={line.id}
                 className={cn(
@@ -168,7 +165,7 @@ export function TodayJarvis({
                 )}
               >
                 <span className="hud-label mr-2">{line.role === "user" ? "You" : "Jarvis"}</span>
-                {line.content}
+                {displayLine(line)}
               </p>
             ))
           )}
@@ -255,6 +252,15 @@ export function TodayJarvis({
       </div>
     </section>
   );
+}
+
+function displayLine(line: Line) {
+  const text = line.content;
+  if (line.role !== "user") return text;
+  if (/morning brief/i.test(text)) return "Morning brief";
+  if (/evening wrap/i.test(text)) return "Evening wrap";
+  if (/who is waiting/i.test(text)) return "Who is waiting?";
+  return text;
 }
 
 function speakReply(text: string, setSpeaking: (v: boolean) => void) {
