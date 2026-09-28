@@ -193,7 +193,7 @@ export function JarvisCore({ mood }: { mood: JarvisMood }) {
 
   return (
     <div
-      className="relative mx-auto flex h-[220px] w-[180px] shrink-0 flex-col items-center sm:h-[240px] sm:w-[196px]"
+      className="relative mx-auto flex h-[220px] w-[180px] shrink-0 flex-col items-center order-first sm:order-none sm:h-[240px] sm:w-[196px]"
       role="img"
       aria-label={`Jarvis ${label}`}
     >
