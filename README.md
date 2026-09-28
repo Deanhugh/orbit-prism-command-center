@@ -141,9 +141,29 @@ Sign into Twenty, then open `/sales`. The board is **live** (not mock) when thos
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
-### TryPost — `/marketing` (blocked on image)
+### TryPost — `/marketing` (app live · API mock until key)
 
-Railway project **Orbit Prism TryPost** exists (app + Postgres + Redis). `ghcr.io/trypostit/trypost:latest` and `v1.0.8` crash on boot (`Laravel\\Pail\\PailServiceProvider` not found). Leave `/marketing` on mock until a working image is published. Then set `TRYPOST_API_URL`, `TRYPOST_APP_URL`, `TRYPOST_API_KEY`.
+Railway project **Orbit Prism TryPost** (app + Postgres + Redis) is up.
+
+- App: https://trypostittrypostlatest-production-32e3.up.railway.app
+- Health: https://trypostittrypostlatest-production-32e3.up.railway.app/up
+- Login: https://trypostittrypostlatest-production-32e3.up.railway.app/login
+- First account: https://trypostittrypostlatest-production-32e3.up.railway.app/register
+- Marketing board: https://command-center-production-e72e.up.railway.app/marketing
+- Image: `ghcr.io/trypostit/trypost:1.1.0` (GHCR tags are `1.1.0` / `latest`, not `v1.1.0`)
+- Command Center vars: `TRYPOST_API_URL`, `TRYPOST_APP_URL` (set to the Railway app URL). `TRYPOST_API_KEY` is still empty.
+
+`/up`, `/login`, and `/register` return 200. `/marketing` embeds and “Open in TryPost” already point at the Railway instance. `/api/social/config` still reports **mock** (`No API key — using local mock posts`) until a workspace Bearer token is saved as `TRYPOST_API_KEY` in **Settings → Marketing**.
+
+To go live:
+
+1. Create the first account at `/register` (public registration is open: `SELF_HOSTED=false`, `REQUIRE_CARD_FOR_TRIAL=false`).
+2. In TryPost, create a workspace API token.
+3. Paste it in Command Center → Settings → Marketing (or set `TRYPOST_API_KEY` on the Command Center service).
+
+After that first account exists, set `SELF_HOSTED=true` again so later signups need an invite.
+
+**What failed before:** the service was pinned to `ghcr.io/trypostit/trypost:v1.0.8` (that tag is not on GHCR). `:latest` then crashed on boot with `Laravel\Pail\PailServiceProvider not found` because the published image still had a stale `bootstrap/cache/packages.php` from the asset-build stage. Production now pins `1.1.0`, wipes `packages.php` / `services.php` in the start command before the entrypoint, and has `PASSPORT_PRIVATE_KEY` / `PASSPORT_PUBLIC_KEY` set (required by the image in production).
 
 ## Deploy
 
