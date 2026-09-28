@@ -26,6 +26,7 @@ them safely.
 - `brain.ts` — reads notes, builds the graph, retrieves relevant notes, writes deliverables.
 - `skills.ts`, `routines.ts`, `when.ts` — skills and the routines clock / cadence parser.
 - `runtime.ts` — the in-memory office: routing, the run loop, demo vs live, the event bus.
+- `paperclip.ts` — Paperclip issue board (live REST or local mock) for Jarvis / Engineering / PMO.
 
 ## Checks
 

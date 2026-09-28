@@ -14,6 +14,7 @@ const REST = [
   { href: "/email", label: "Email" },
   { href: "/sales", label: "Sales" },
   { href: "/pmo", label: "PMO" },
+  { href: "/paperclip", label: "Paperclip" },
   { href: "/finance", label: "Finance" },
   { href: "/vault", label: "Vault" },
 ] as const;

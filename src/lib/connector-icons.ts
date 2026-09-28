@@ -76,6 +76,7 @@ const COLOR: Record<string, string> = {
   plane: "#3f76ff",
   trypost: "#e8562e",
   mautic: "#4e5e9e",
+  paperclip: "#1c1917",
 };
 
 export function connectorIcon(key: string): Brand | null {
