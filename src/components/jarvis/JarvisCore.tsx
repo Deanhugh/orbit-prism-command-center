@@ -206,9 +206,9 @@ export function JarvisCore({ mood }: { mood: JarvisMood }) {
         const a = project(MESH.verts[ia]);
         const b = project(MESH.verts[ib]);
         const depth = (a.z + b.z) / 2;
-        const alpha = (0.1 + (depth + 1) * 0.22) * pulse;
+        const alpha = (0.16 + (depth + 1) * 0.28) * pulse;
         ctx.strokeStyle = `rgba(90, 214, 255, ${alpha})`;
-        ctx.lineWidth = depth > 0.15 ? 1.15 : 0.55;
+        ctx.lineWidth = depth > 0.15 ? 1.25 : 0.65;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -317,16 +317,16 @@ export function JarvisCore({ mood }: { mood: JarvisMood }) {
 
   return (
     <div
-      className="relative mx-auto flex h-[240px] w-[220px] shrink-0 flex-col items-center order-first sm:order-none sm:h-[280px] sm:w-[260px]"
+      className="relative mx-auto flex h-[200px] w-[200px] shrink-0 flex-col items-center sm:h-[236px] sm:w-[236px]"
       role="img"
       aria-label={`Jarvis AI Core, ${label}`}
     >
       <canvas ref={canvasRef} className="h-full w-full" aria-hidden />
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center pt-1">
-        <p className="serif text-[22px] font-semibold leading-none tracking-[0.28em] text-[#7eecff] drop-shadow-[0_0_12px_rgba(90,214,255,0.85)] sm:text-[26px]">
+        <p className="serif text-[18px] font-semibold leading-none tracking-[0.22em] text-[#7eecff] drop-shadow-[0_0_12px_rgba(90,214,255,0.85)] sm:text-[22px]">
           JARVIS
         </p>
-        <p className="mt-2 text-[9px] font-semibold uppercase tracking-[0.46em] text-[#7eecff]/80">
+        <p className="mt-1.5 text-[8px] font-semibold uppercase tracking-[0.4em] text-[#7eecff]/80 sm:text-[9px]">
           AI Core
         </p>
       </div>

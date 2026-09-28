@@ -121,9 +121,11 @@ export function TodayJarvis({
       className="hud-panel hud-glow relative flex min-h-[400px] flex-col overflow-hidden p-5 lg:col-span-5 lg:min-h-[460px]"
     >
       <div className="hud-scan absolute inset-0 opacity-40" />
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="grid gap-3 sm:grid-cols-[1fr_minmax(200px,280px)] sm:items-start">
-          <div className="min-w-0">
+      <div className="pointer-events-none absolute -right-2 top-1 z-[1] sm:right-1 sm:top-2">
+        <JarvisCore mood={mood} />
+      </div>
+      <div className="relative z-[2] flex min-h-0 flex-1 flex-col">
+        <div className="min-w-0 pr-[148px] sm:pr-[200px]">
             <p className="hud-label flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emails" />
               Today · Jarvis
@@ -145,8 +147,6 @@ export function TodayJarvis({
                 />
               </div>
             </div>
-          </div>
-          <JarvisCore mood={mood} />
         </div>
 
         <div className="mt-4 min-h-[72px] max-h-[120px] flex-1 space-y-2 overflow-y-auto border-t border-line/70 pt-3 thin-scroll pr-1">
