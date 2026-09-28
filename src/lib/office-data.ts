@@ -159,7 +159,6 @@ export const DEMO_CONNECTORS: Connector[] = [
   c("Bigcapital", "bigcapital", "connected", ["finance"], "Bigcapital — using local mock books"),
   c("Plane", "plane", "connected", ["ops", "emails"], "Plane — using local mock projects"),
   c("TryPost", "trypost", "connected", ["marketing"], "TryPost — using local mock posts"),
-  c("Mautic", "mautic", "connected", ["marketing"], "Mautic — using local mock emails"),
   c("GitHub", "github", "connected", ["ops"]),
   c("Slack", "slack", "connected", ["emails", "ops"]),
   c("Canva", "canva", "connected", ["marketing", "delivery"]),
