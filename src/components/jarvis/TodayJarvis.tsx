@@ -118,11 +118,11 @@ export function TodayJarvis({
   return (
     <section
       id="today-jarvis"
-      className="hud-panel hud-glow relative flex min-h-[360px] flex-col overflow-hidden p-5 lg:col-span-5 lg:min-h-[420px]"
+      className="hud-panel hud-glow relative flex min-h-[400px] flex-col overflow-hidden p-5 lg:col-span-5 lg:min-h-[460px]"
     >
       <div className="hud-scan absolute inset-0 opacity-40" />
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="grid gap-3 sm:grid-cols-[1fr_minmax(160px,200px)] sm:items-start">
+        <div className="grid gap-3 sm:grid-cols-[1fr_minmax(200px,280px)] sm:items-start">
           <div className="min-w-0">
             <p className="hud-label flex items-center gap-2">
               <span className="h-1.5 w-1.5 rounded-full bg-emails" />
