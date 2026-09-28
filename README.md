@@ -141,6 +141,17 @@ Sign into Twenty, then open `/sales`. The board is **live** (not mock) when thos
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
+### CAD — `/cad` (text to part)
+
+Orbit-native engineering studio. Left: prompt + engineering-agent build log. Right: Three.js viewport that fills in as solids are placed. This is **not** a vendored CAD kernel (CascadeStudio / Zoo Design Studio / Cursor). Agents emit a box-solid model the browser can mesh.
+
+- Page: https://command-center-production-e72e.up.railway.app/cad
+- Agents: Engineering (`op_lead`, `op_intel`, `op_legal`, `op_comply`, `op_dash`) have the `cad` tool (`cad_build`, `cad_list`, `cad_get`)
+- Named bodies: Hilbert cube infill, L-bracket, enclosure, mounting plate, flange, shaft. Other prompts get a small parametric stand-in.
+- Models persist in `data/cad-models.json` on the host volume.
+
+Prompt on the page yourself, or assign an Engineering task that mentions CAD / bracket / enclosure / Hilbert — the run loop writes the part and links `/cad`.
+
 ### TryPost — `/marketing` (blocked on image)
 
 Railway project **Orbit Prism TryPost** exists (app + Postgres + Redis). `ghcr.io/trypostit/trypost:latest` and `v1.0.8` crash on boot (`Laravel\\Pail\\PailServiceProvider` not found). Leave `/marketing` on mock until a working image is published. Then set `TRYPOST_API_URL`, `TRYPOST_APP_URL`, `TRYPOST_API_KEY`.
