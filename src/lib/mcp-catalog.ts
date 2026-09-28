@@ -14,6 +14,7 @@ export const MCP_CATALOG: McpCatalogItem[] = [
   { id: "slack", name: "Slack", description: "Read and send workspace messages", command: "npx -y @modelcontextprotocol/server-slack", transport: "stdio" },
   { id: "notion", name: "Notion", description: "Search and update workspace pages", command: "npx -y @notionhq/notion-mcp-server", transport: "stdio" },
   { id: "github", name: "GitHub", description: "Repos, issues, and pull requests", command: "npx -y @modelcontextprotocol/server-github", transport: "stdio" },
+  { id: "paperclip", name: "Paperclip", description: "List agents, create/checkout issues, comment, and handle approvals", command: "npx -y @paperclipai/mcp-server", transport: "stdio" },
   { id: "linear", name: "Linear", description: "Issues and project tracking", command: "npx -y @llmindset/mcp-linear", transport: "stdio" },
   { id: "jira", name: "Jira", description: "Work items and sprints", command: "npx -y @aashari/mcp-server-atlassian-jira", transport: "stdio" },
   { id: "hubspot", name: "HubSpot", description: "CRM contacts and deals", command: "npx -y @modelcontextprotocol/server-hubspot", transport: "stdio" },

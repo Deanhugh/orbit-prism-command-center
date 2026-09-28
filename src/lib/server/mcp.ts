@@ -6,6 +6,7 @@ import { twentyConfigured } from "./twenty";
 import { bigcapitalConfigured } from "./bigcapital";
 import { planeConfigured } from "./plane";
 import { trypostConfigured } from "./trypost";
+import { paperclipConfigured } from "./paperclip";
 import { mauticConfigured } from "./mautic";
 
 // Default department wiring for known brands (anything unknown feeds every pod).
@@ -25,6 +26,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   crm: ["sales"],
   bigcapital: ["finance"],
   plane: ["ops", "emails"],
+  paperclip: ["ops", "emails"],
   trypost: ["marketing"],
   mautic: ["marketing"],
   github: ["ops"],
@@ -78,6 +80,7 @@ function applyPolicy(list: Connector[]): Connector[] {
   const crmLive = twentyConfigured();
   const booksLive = bigcapitalConfigured();
   const pmLive = planeConfigured();
+  const paperclipLive = paperclipConfigured();
   const socialLive = trypostConfigured();
   const emailLive = mauticConfigured();
   return list.map((conn) => {
@@ -97,6 +100,9 @@ function applyPolicy(list: Connector[]): Connector[] {
     // Same for project management (Plane).
     if (conn.key === "plane" && status !== "denied") {
       reason = pmLive ? "Plane — live instance connected" : "Plane — using local mock projects";
+    }
+    if (conn.key === "paperclip" && status !== "denied") {
+      reason = paperclipLive ? "Paperclip — live instance connected" : "Paperclip — using local mock issues";
     }
     // Same for marketing (TryPost).
     if (conn.key === "trypost" && status !== "denied") {

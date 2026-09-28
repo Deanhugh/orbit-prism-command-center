@@ -5,6 +5,7 @@ import { retrieve } from "./brain";
 import { loadSkills, skillsForAgent } from "./skills";
 import { toolSchemasForAgent } from "./composio";
 import type { ChatMsg, ToolSchema } from "./llm";
+import type { Agent } from "../types";
 
 export interface ChatOptions {
   mode?: "chat" | "plan" | "task";
@@ -41,6 +42,7 @@ function systemPromptFor(agentId: string, userText: string, opts: ChatOptions = 
       `You are ${JARVIS.name}, the ${JARVIS.role} at ${cfg.studio}. Every department lead and agent reports to you; you report to the owner.`,
       JARVIS.does,
       `When asked to do work, break it into steps, say which agent/department owns each, and flag anything that needs the owner's approval.`,
+      `You can open, list, checkout, and comment on Paperclip issues with your tools. Use that board for real work instead of only Orbit's in-memory task list.`,
       `Standing rule: read freely; send, post, pay, delete or change anything outside this machine ONLY when explicitly asked for that exact action.`,
       picked ? `Apply this skill for this request:\n### Skill: ${picked.name}\n${picked.body.slice(0, 1600)}` : "",
       rest ? `Your other skills:\n${rest}` : "",
@@ -91,6 +93,24 @@ export function prepareChat(
   msgs.push({ role: "user", content: userText });
 
   // In Plan mode the agent only outlines — no tool execution.
-  const tools = responderId === "jarvis" || opts.mode === "plan" ? [] : toolSchemasForAgent(agentById(responderId)!);
+  // Jarvis gets Paperclip issue tools (not the full department toolkit).
+  const tools = opts.mode === "plan"
+    ? []
+    : responderId === "jarvis"
+      ? toolSchemasForAgent(jarvisAsAgent())
+      : toolSchemasForAgent(agentById(responderId)!);
   return { responderId, responderName, messages: msgs, tools };
+}
+
+function jarvisAsAgent(): Agent {
+  return {
+    id: "jarvis",
+    dept: "ops",
+    lead: true,
+    name: JARVIS.name,
+    role: JARVIS.role,
+    does: JARVIS.does,
+    tools: [...JARVIS.tools],
+    seat: 0,
+  };
 }

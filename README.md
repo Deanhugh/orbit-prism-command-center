@@ -117,7 +117,7 @@ Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staf
 
 ## Settings
 
-Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar. Department platforms (Twenty, Bigcapital, Plane, TryPost, Mautic) live under **Settings → MCP**.
+Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar. Department platforms (Twenty, Bigcapital, Plane, Paperclip, TryPost, Mautic) live under **Settings → MCP**.
 
 ## Department platforms on Railway
 
@@ -140,6 +140,16 @@ Sign into Twenty, then open `/sales`. The board is **live** (not mock) when thos
 - PMO board: https://command-center-production-e72e.up.railway.app/pmo
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
+
+### Paperclip — `/paperclip` (sibling Railway)
+
+- App: https://paperclip-production-f824.up.railway.app
+- Railway project: **Orbit Prism Paperclip** (app + Postgres, image `ghcr.io/paperclipai/paperclip`)
+- Command Center vars: `PAPERCLIP_API_URL`, `PAPERCLIP_APP_URL`, `PAPERCLIP_API_KEY`, `PAPERCLIP_COMPANY_ID`
+- Page: https://command-center-production-e72e.up.railway.app/paperclip
+- MCP: `npx -y @paperclipai/mcp-server` (catalog id `paperclip`)
+
+Sign into Paperclip, create a company, mint a board API key, then paste the key and company ID in Settings → Connectors → Paperclip. Until those two are set, `/paperclip` uses local mock issues and Jarvis / Engineering / PMO still have the tools against the mock.
 
 ### TryPost — `/marketing` (blocked on image)
 

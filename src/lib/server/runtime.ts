@@ -24,6 +24,10 @@ import {
 import {
   createWorkItem, listWorkItems, planeConfigured, pmSummary, updateWorkItem, type StateGroup,
 } from "./plane";
+import {
+  createIssue as createPaperclipIssue, listIssues as listPaperclipIssues, paperclipConfigured,
+  paperclipSummary, updateIssue as updatePaperclipIssue, STATUS_LABEL, type IssueStatus,
+} from "./paperclip";
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
 import {
   createEmail, emailSummary, listEmails, mauticConfigured, sendEmail,
@@ -240,6 +244,10 @@ async function runTask(id: string) {
     const pm = await pmForTask(task.title, task.dept, agent.name);
     if (pm) { deliverable += `\n\n---\n\n### Projects (${planeConfigured() ? "Plane — live" : "Plane — local"})\n${pm}`; if (!usedTools.includes("plane")) usedTools.unshift("plane"); }
   }
+  if ((task.dept === "ops" || task.dept === "emails") && allowed.includes("paperclip")) {
+    const pc = await paperclipForTask(task.title, task.dept, agent.name);
+    if (pc) { deliverable += `\n\n---\n\n### Paperclip (${paperclipConfigured() ? "live" : "local"})\n${pc}`; if (!usedTools.includes("paperclip")) usedTools.unshift("paperclip"); }
+  }
   if (task.dept === "marketing") {
     if (agent.tools.includes("mautic") && allowed.includes("mautic")) {
       const email = await emailForTask(task.title);
@@ -367,6 +375,38 @@ async function pmForTask(title: string, dept: DeptId, agentName: string): Promis
     const sum = await pmSummary();
     const lines = sum.byState.filter((s) => s.count > 0).map((s) => `- ${s.label}: ${s.count}`);
     return [`Project board snapshot (${sum.totalProjects} projects, ${sum.totalItems} work items):`, ...lines, sum.urgent ? `- **Urgent:** ${sum.urgent}` : ""].filter(Boolean).join("\n");
+  } catch { return null; }
+}
+async function paperclipForTask(title: string, dept: DeptId, agentName: string): Promise<string | null> {
+  const t = title.toLowerCase();
+  try {
+    const wantsCreate = /\b(create|add|open|plan|new|log|file|raise)\b/.test(t) && /\b(issue|ticket|paperclip)\b/.test(t);
+    const wantsDone = /\b(done|complete|completed|finish|finished|ship|shipped|close|closed)\b/.test(t);
+    const wantsStart = /\b(start|begin|pick up|in progress|working on|wip|checkout)\b/.test(t);
+    if (wantsCreate) {
+      const status: IssueStatus = dept === "emails" ? "backlog" : "todo";
+      const item = await createPaperclipIssue({
+        title: title.replace(/\s+/g, " ").trim().slice(0, 90),
+        priority: /\burgent|asap|critical\b/.test(t) ? "urgent" : /\bhigh\b/.test(t) ? "high" : "medium",
+        status,
+        assignee: agentName,
+      });
+      return `Opened Paperclip issue **${item.identifier}** — "${item.title}" (${STATUS_LABEL[item.status]}, ${item.priority}).`;
+    }
+    if (wantsDone || wantsStart) {
+      const items = await listPaperclipIssues({ limit: 200 });
+      const terms = t.split(/\W+/).filter((w) => w.length > 3);
+      const open = items.filter((w) => w.status !== "done" && w.status !== "cancelled");
+      const match = open.find((w) => terms.some((k) => w.title.toLowerCase().includes(k) || w.identifier.toLowerCase().includes(k))) || open.find((w) => (dept === "ops" ? w.status === "todo" || w.status === "in_progress" : true)) || open[0];
+      if (match) {
+        const target: IssueStatus = wantsDone ? "done" : "in_progress";
+        const updated = await updatePaperclipIssue(match.id, { status: target });
+        if (updated) return `Moved Paperclip issue **${updated.identifier}** — "${updated.title}" to **${updated.status}**.`;
+      }
+    }
+    const sum = await paperclipSummary();
+    const lines = sum.byStatus.filter((s) => s.count > 0).map((s) => `- ${s.label}: ${s.count}`);
+    return [`Paperclip board snapshot (${sum.totalIssues} issues):`, ...lines, sum.urgent ? `- **High / urgent:** ${sum.urgent}` : ""].filter(Boolean).join("\n");
   } catch { return null; }
 }
 async function socialForTask(title: string, agentName: string): Promise<string | null> {

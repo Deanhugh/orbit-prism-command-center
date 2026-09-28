@@ -9,6 +9,7 @@ export function PlatformConnections() {
       <CrmConnection />
       <FinanceConnection />
       <PmoConnection />
+      <PaperclipConnection />
       <MarketingConnection />
       <EmailConnection />
     </>
@@ -178,6 +179,67 @@ function PmoConnection() {
         <div>
           <label className="text-[9px] uppercase tracking-wide text-ink-soft">API key {cfg?.hasKey ? "(set)" : ""}</label>
           <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={cfg?.hasKey ? "•••• saved" : "plane_api_…"} className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
+        </div>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <button onClick={save} disabled={saving} className="rounded-md bg-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-canvas disabled:opacity-40">{saving ? "Saving…" : "Save & test"}</button>
+        <span className="text-[10px] text-ink-soft">Stored locally in <code>data/secrets.json</code> (gitignored).</span>
+      </div>
+    </section>
+  );
+}
+
+interface PaperclipCfg { mode: "live" | "mock"; baseUrl: string; appUrl?: string; companyId?: string; hasKey: boolean; reachable?: boolean; reason?: string }
+function PaperclipConnection() {
+  const [cfg, setCfg] = useState<PaperclipCfg | null>(null);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [appUrl, setAppUrl] = useState("");
+  const [companyId, setCompanyId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const load = () => fetch("/api/paperclip/config").then((r) => r.json()).then((d) => { setCfg(d); setBaseUrl(d.baseUrl || ""); setAppUrl(d.appUrl || ""); setCompanyId(d.companyId || ""); });
+  useEffect(() => { load(); }, []);
+
+  async function save() {
+    setSaving(true);
+    const res = await fetch("/api/paperclip/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseUrl, appUrl, companyId, ...(apiKey ? { apiKey } : {}) }),
+    });
+    const d = await res.json();
+    setCfg(d); setApiKey(""); setSaving(false);
+  }
+
+  const live = cfg?.mode === "live" && cfg?.reachable !== false;
+  return (
+    <section className="rounded-lg border border-line bg-panel p-4">
+      <div className="flex items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : cfg?.mode === "live" ? "bg-finance" : "bg-sales")} />
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Paperclip</h2>
+        <span className="text-[10px] text-ink-soft">{cfg ? (cfg.mode === "live" ? `live · ${cfg.reason || ""}` : "using local mock issues") : ""}</span>
+        <a href="/paperclip" className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-ops">Open Paperclip →</a>
+      </div>
+      <p className="mt-1 text-[11px] text-ink-soft">
+        Connect your <a className="underline" href="https://github.com/paperclipai/paperclip" target="_blank" rel="noreferrer">Paperclip</a> instance so Jarvis, Engineering, and PMO can open issues on the agent board instead of only Orbit&apos;s in-memory task list. Create a company, then mint a board API key in Paperclip.
+      </p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className="text-[9px] uppercase tracking-wide text-ink-soft">PAPERCLIP_API_URL</label>
+          <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://paperclip-production-f824.up.railway.app" className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
+        </div>
+        <div>
+          <label className="text-[9px] uppercase tracking-wide text-ink-soft">PAPERCLIP_APP_URL (embed / “Open in Paperclip”)</label>
+          <input value={appUrl} onChange={(e) => setAppUrl(e.target.value)} placeholder="same as API URL, usually" className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
+        </div>
+        <div>
+          <label className="text-[9px] uppercase tracking-wide text-ink-soft">PAPERCLIP_COMPANY_ID</label>
+          <input value={companyId} onChange={(e) => setCompanyId(e.target.value)} placeholder="company uuid from Paperclip" className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
+        </div>
+        <div>
+          <label className="text-[9px] uppercase tracking-wide text-ink-soft">PAPERCLIP_API_KEY {cfg?.hasKey ? "(set)" : ""}</label>
+          <input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder={cfg?.hasKey ? "•••• saved" : "board or agent API key"} className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
         </div>
       </div>
       <div className="mt-2 flex items-center gap-2">

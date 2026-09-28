@@ -3,6 +3,7 @@ import { composioReady, getSecret, loadAgentsConfig } from "./providers";
 import { CRM_TOOLS, runCrmTool } from "./twenty";
 import { FINANCE_TOOLS, runFinanceTool } from "./bigcapital";
 import { PM_TOOLS, runPmTool } from "./plane";
+import { PAPERCLIP_TOOLS, runPaperclipTool } from "./paperclip";
 import { SOCIAL_TOOLS, runSocialTool } from "./trypost";
 import { EMAIL_TOOLS, runEmailTool } from "./mautic";
 import type { Agent } from "../types";
@@ -69,6 +70,16 @@ export function toolSchemasForAgent(agent: Agent): ToolSchema[] {
     }
   }
 
+  // Paperclip issue tools — Jarvis, Engineering, and PMO open issues here.
+  if (keys.includes("paperclip")) {
+    for (const t of PAPERCLIP_TOOLS) {
+      schemas.push({
+        type: "function",
+        function: { name: t.name, description: t.description, parameters: t.parameters },
+      });
+    }
+  }
+
   // Marketing (TryPost) social tools — for the marketing content/social agents.
   if (keys.includes("trypost")) {
     for (const t of SOCIAL_TOOLS) {
@@ -92,7 +103,7 @@ export function toolSchemasForAgent(agent: Agent): ToolSchema[] {
   // Other connector tools are gated behind Composio.
   if (composioEnabled()) {
     for (const key of keys) {
-      if (key === "crm" || key === "bigcapital" || key === "plane" || key === "trypost" || key === "mautic") continue;
+      if (key === "crm" || key === "bigcapital" || key === "plane" || key === "paperclip" || key === "trypost" || key === "mautic") continue;
       for (const t of CONNECTOR_TOOLS[key] || []) {
         schemas.push({
           type: "function",
@@ -127,6 +138,10 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
   // PM tools run against Plane (live or mock) — real reads/writes on work items.
   if (name.startsWith("pm_")) {
     return runPmTool(name, args);
+  }
+  // Paperclip tools run against Paperclip (live or mock) — issues, comments, checkout.
+  if (name.startsWith("paperclip_")) {
+    return runPaperclipTool(name, args);
   }
   // Social tools run against TryPost (live or mock) — real reads/writes on posts.
   if (name.startsWith("social_")) {
