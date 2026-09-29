@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
   }
   const result = await synthesizeFish(text);
   if (!result.ok) {
-    return NextResponse.json({ fallback: true, reason: result.reason }, { status: 503 });
+    const status = result.reason === "no Fish API key" || result.reason === "empty text" ? 200 : 503;
+    return NextResponse.json({ fallback: true, reason: result.reason }, { status });
   }
   return new NextResponse(new Uint8Array(result.audio), {
     status: 200,
