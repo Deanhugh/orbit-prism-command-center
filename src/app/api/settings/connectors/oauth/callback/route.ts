@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const err = req.nextUrl.searchParams.get("error");
   if (err) {
-    return redirectTo(`/jarvis/settings?tab=mcp&mcp_error=${encodeURIComponent(err)}`);
+    const detail = req.nextUrl.searchParams.get("error_description") || err;
+    return redirectTo(`/jarvis/settings?tab=mcp&mcp_error=${encodeURIComponent(detail)}`);
   }
   const code = req.nextUrl.searchParams.get("code") || "";
   const state = req.nextUrl.searchParams.get("state") || "";

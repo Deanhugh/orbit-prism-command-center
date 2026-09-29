@@ -109,7 +109,18 @@ export function Connectors() {
         <a href="#browse-mcp" className="rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-canvas">Browse MCP</a>
         <a href="#add-mcp" className="rounded-full border border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink">Add MCP</a>
       </div>
-      {banner ? <p className="rounded-md border border-line bg-panel px-3 py-2 text-[12px] text-ink">{banner}</p> : null}
+      {banner ? (
+        <p
+          className={cn(
+            "rounded-md border px-3 py-2 text-[12px]",
+            /connected/i.test(banner)
+              ? "border-emails/40 bg-panel text-ink"
+              : "border-finance/50 bg-finance/10 text-ink",
+          )}
+        >
+          {banner}
+        </p>
+      ) : null}
 
       <NotionPanel
         row={notion}
@@ -316,7 +327,7 @@ function AuthActions({
           href={oauthHref}
           className="rounded-md border border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink"
         >
-          Connect with OAuth
+          Connect with OAuth →
         </a>
         <button
           type="button"
