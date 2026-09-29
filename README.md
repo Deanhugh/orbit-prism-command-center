@@ -15,6 +15,7 @@ What landed in this stack:
 - **Remote MCP** on Railway — Notion, Apify (scrape), Krea (image/video), GitHub, Stripe
 - **Routines** — Morning Brief and Evening Wrap on the dashboard
 - **Jarvis Today** — spoken/typed chat that can dispatch office work
+- **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
 - **CAD** (`/cad`) and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
 
 ## Run locally
@@ -211,6 +212,8 @@ Enable the tile, connect, **Test**. Local `npx` GitHub/Stripe servers in the cat
 ### Jarvis Today
 
 The Jarvis home (`/jarvis`) chat — typed or spoken — is **Today**: brief, who is waiting, calendar, then office work. The Today card shows an animated wireframe AI core (not a photo bust). When the owner asks to build, film, invoice, scrape, or generate, Jarvis dispatches the task onto the Agents floor. Every desk may run CRM, Plane, books, TryPost, Studio, CAD, Notion, GitHub, Apify, and Krea. Confirmations stay short and spoken-friendly. Live MCP results (Notion search, Apify scrape, Krea generate) attach when the message matches those apps.
+
+**Voice:** Morning Brief, Evening Wrap, and Today speak through a [Fish Audio](https://fish.audio/) library voice, not the browser’s default system voice. Open **Settings → Voice** (`/jarvis/settings?tab=voice`). Paste `FISH_API_KEY` (or set the same name on Railway), pick a public library voice (default is **JARVIS**), and Preview. `s2.1-pro` is the production model; `s2.1-pro-free` is for prototyping. If the key is missing or Fish is down, the browser `speechSynthesis` path still runs. This is a REST TTS call (`POST /api/jarvis/voice/speak`) — not an MCP connector.
 
 The **+** menu on a desk ticket attaches a Brain note or a local file, and can open Browse MCP without leaving the floor.
 
