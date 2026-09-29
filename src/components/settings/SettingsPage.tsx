@@ -10,27 +10,30 @@ import { Brand } from "@/components/chrome/Brand";
 import { Providers } from "@/components/settings/settings-providers";
 import { Connectors } from "@/components/settings/settings-connectors";
 import { Skills } from "@/components/settings/settings-skills";
+import { Routines } from "@/components/settings/settings-routines";
 
 export { Providers } from "@/components/settings/settings-providers";
 export { Connectors } from "@/components/settings/settings-connectors";
 export { Skills } from "@/components/settings/settings-skills";
 export { Plugins } from "@/components/settings/settings-plugins";
 
-type Tab = "providers" | "connectors" | "skills";
+type Tab = "providers" | "connectors" | "skills" | "routines";
 const TAB_LABEL: Record<Tab, string> = {
   providers: "Providers",
   connectors: "MCP",
   skills: "Skills",
+  routines: "Routines",
 };
 const TAB_HREF: Record<Tab, string> = {
   providers: "/jarvis/settings?tab=providers",
   connectors: "/jarvis/settings?tab=mcp",
   skills: "/jarvis/settings?tab=skills",
+  routines: "/jarvis/settings?tab=routines",
 };
 
 function tabFromQuery(raw: string | null): Tab {
   if (raw === "mcp" || raw === "connectors") return "connectors";
-  if (raw === "skills" || raw === "providers") return raw;
+  if (raw === "skills" || raw === "providers" || raw === "routines") return raw;
   return "providers";
 }
 
@@ -63,7 +66,7 @@ function SettingsInner() {
       </header>
 
       <div className="mx-auto flex max-w-[900px] gap-2 px-6 py-3">
-        {(["providers", "connectors", "skills"] as Tab[]).map((t) => (
+        {(["providers", "connectors", "skills", "routines"] as Tab[]).map((t) => (
           <Link
             key={t}
             href={TAB_HREF[t]}
@@ -78,6 +81,7 @@ function SettingsInner() {
         {tab === "providers" && <Providers />}
         {tab === "connectors" && <Connectors />}
         {tab === "skills" && <Skills />}
+        {tab === "routines" && <Routines />}
       </div>
     </div>
   );

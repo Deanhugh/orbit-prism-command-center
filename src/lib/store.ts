@@ -9,6 +9,7 @@ import type {
   OfficeEvent,
   Routine,
   RunMode,
+  StoredBrief,
   Task,
 } from "./types";
 
@@ -21,6 +22,7 @@ interface OfficeStore {
   connectors: Connector[];
   tasks: Task[];
   routines: Routine[];
+  briefs: StoredBrief[];
   agents: AgentRuntimeInfo[];
   messages: AgentMessage[];
   usage: { session: number; week: number };
@@ -64,6 +66,11 @@ function upsertRoutine(list: Routine[], r: Routine): Routine[] {
   return copy;
 }
 
+function upsertBrief(list: StoredBrief[], b: StoredBrief): StoredBrief[] {
+  const rest = list.filter((x) => !(x.kind === b.kind && x.date === b.date) && x.id !== b.id);
+  return [b, ...rest];
+}
+
 export const useOffice = create<OfficeStore>((set, get) => ({
   name: "Orbit Prism Operating System",
   mode: "demo",
@@ -73,6 +80,7 @@ export const useOffice = create<OfficeStore>((set, get) => ({
   connectors: [],
   tasks: [],
   routines: [],
+  briefs: [],
   agents: [],
   messages: [],
   usage: { session: 0, week: 0 },
@@ -117,6 +125,7 @@ export const useOffice = create<OfficeStore>((set, get) => ({
           connectors: s.connectors,
           tasks: s.tasks,
           routines: s.routines,
+          briefs: s.briefs || [],
           agents: s.agents,
           usage: s.usage,
         });
@@ -124,6 +133,8 @@ export const useOffice = create<OfficeStore>((set, get) => ({
         set((st) => ({ tasks: upsertTask(st.tasks, data.task) }));
       } else if (data.type === "routine") {
         set((st) => ({ routines: upsertRoutine(st.routines, data.routine) }));
+      } else if (data.type === "brief") {
+        set((st) => ({ briefs: upsertBrief(st.briefs, data.brief) }));
       } else if (data.type === "agent") {
         set((st) => {
           const idx = st.agents.findIndex((a) => a.id === data.agent.id);
