@@ -15,6 +15,7 @@ interface OAuthMeta {
   token_endpoint?: string;
   registration_endpoint?: string;
   code_challenge_methods_supported?: string[];
+  scopes_supported?: string[];
 }
 
 interface PendingAuth {
@@ -63,12 +64,22 @@ function pkce(): { verifier: string; challenge: string } {
 }
 
 async function getJson(url: string): Promise<Record<string, unknown> | null> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 10_000);
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, redirect: "follow" });
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      redirect: "follow",
+      signal: ac.signal,
+    });
     if (!res.ok) return null;
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("json")) return null;
     return (await res.json()) as Record<string, unknown>;
   } catch {
     return null;
+  } finally {
+    clearTimeout(t);
   }
 }
 
@@ -80,18 +91,61 @@ export function resourceOrigin(url: string): string {
   }
 }
 
-export async function discoverAuthServer(mcpUrl: string): Promise<{ resource: string; meta: OAuthMeta }> {
-  const resource = resourceOrigin(mcpUrl);
-  const protectedMd =
-    (await getJson(`${resource}/.well-known/oauth-protected-resource`)) ||
-    (await getJson(`${resource}/.well-known/oauth-protected-resource/mcp`));
-  const servers = (protectedMd?.authorization_servers as string[] | undefined) || [resource];
-  const issuer = String(servers[0] || resource).replace(/\/+$/, "");
+function canonicalMcpUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.hash = "";
+    u.search = "";
+    const href = u.toString();
+    return href.endsWith("/") && u.pathname !== "/" ? href.slice(0, -1) : href;
+  } catch {
+    return url;
+  }
+}
+
+function stringList(v: unknown): string[] {
+  return Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean) : [];
+}
+
+export async function discoverAuthServer(mcpUrl: string): Promise<{
+  resource: string;
+  meta: OAuthMeta;
+  scopes: string[];
+}> {
+  const mcp = canonicalMcpUrl(mcpUrl);
+  const origin = resourceOrigin(mcp);
+  let pathname = "/";
+  try {
+    pathname = new URL(mcp).pathname.replace(/\/+$/, "") || "/";
+  } catch {
+    /* ignore */
+  }
+  const prmUrls = [
+    pathname !== "/" ? `${origin}/.well-known/oauth-protected-resource${pathname}` : "",
+    `${origin}/.well-known/oauth-protected-resource`,
+    `${origin}/.well-known/oauth-protected-resource/mcp`,
+  ].filter(Boolean);
+
+  let protectedMd: Record<string, unknown> | null = null;
+  for (const u of prmUrls) {
+    protectedMd = await getJson(u);
+    if (protectedMd) break;
+  }
+
+  const resource = canonicalMcpUrl(String(protectedMd?.resource || mcp));
+  const servers = stringList(protectedMd?.authorization_servers);
+  const issuer = (servers[0] || origin).replace(/\/+$/, "");
   const meta =
     ((await getJson(`${issuer}/.well-known/oauth-authorization-server`)) as OAuthMeta | null) ||
     ((await getJson(`${issuer}/.well-known/openid-configuration`)) as OAuthMeta | null) ||
     {};
-  return { resource, meta: meta || {} };
+  const scopes =
+    stringList(meta.scopes_supported).length
+      ? stringList(meta.scopes_supported)
+      : stringList(protectedMd?.scopes_supported).length
+        ? stringList(protectedMd?.scopes_supported)
+        : ["default"];
+  return { resource, meta: meta || {}, scopes };
 }
 
 async function registerClient(
@@ -125,7 +179,7 @@ export async function startMcpOAuth(opts: {
   clientName?: string;
 }): Promise<{ authorizeUrl: string }> {
   const key = mcpKey(opts.name);
-  const { resource, meta } = await discoverAuthServer(opts.url);
+  const { resource, meta, scopes } = await discoverAuthServer(opts.url);
   const authorize = meta.authorization_endpoint;
   const tokenEndpoint = meta.token_endpoint;
   if (!authorize || !tokenEndpoint) {
@@ -168,7 +222,7 @@ export async function startMcpOAuth(opts: {
   u.searchParams.set("state", state);
   u.searchParams.set("code_challenge", challenge);
   u.searchParams.set("code_challenge_method", "S256");
-  u.searchParams.set("scope", "default");
+  u.searchParams.set("scope", scopes.join(" "));
   u.searchParams.set("resource", resource);
   return { authorizeUrl: u.toString() };
 }
