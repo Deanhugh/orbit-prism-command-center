@@ -79,6 +79,8 @@ skills/
   inbox-triage/SKILL.md
   client-report/SKILL.md
   proposal/SKILL.md
+  lanshu-create-ai-presenter-video/SKILL.md
+  remotion-best-practices/SKILL.md
   your-new-skill/SKILL.md
 ```
 
@@ -113,7 +115,7 @@ department: emails
 - `agents` — agent ids from the office (`jarvis` / `chief` for the Chief of Staff), or `all`
 - `department` — department id, or `all`
 
-Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staff`.
+Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staff`, `lanshu-create-ai-presenter-video`, `remotion-best-practices`.
 
 ## Settings
 
