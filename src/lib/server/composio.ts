@@ -6,6 +6,7 @@ import { PM_TOOLS, runPmTool } from "./plane";
 import { SOCIAL_TOOLS, runSocialTool } from "./trypost";
 import { EMAIL_TOOLS, runEmailTool } from "./mautic";
 import { CAD_TOOLS, runCadTool } from "./cad";
+import { STUDIO_TOOLS, runStudioTool } from "./studio";
 import type { Agent } from "../types";
 
 export function composioEnabled(): boolean {
@@ -89,6 +90,15 @@ export function toolSchemasForAgent(agent: Agent): ToolSchema[] {
     }
   }
 
+  if (keys.includes("studio")) {
+    for (const t of STUDIO_TOOLS) {
+      schemas.push({
+        type: "function",
+        function: { name: t.name, description: t.description, parameters: t.parameters },
+      });
+    }
+  }
+
   // Email marketing (Mautic) tools — for the Email Marketing agent.
   if (keys.includes("mautic")) {
     for (const t of EMAIL_TOOLS) {
@@ -102,7 +112,7 @@ export function toolSchemasForAgent(agent: Agent): ToolSchema[] {
   // Other connector tools are gated behind Composio.
   if (composioEnabled()) {
     for (const key of keys) {
-      if (key === "crm" || key === "bigcapital" || key === "plane" || key === "trypost" || key === "mautic" || key === "cad") continue;
+      if (key === "crm" || key === "bigcapital" || key === "plane" || key === "trypost" || key === "mautic" || key === "cad" || key === "studio") continue;
       for (const t of CONNECTOR_TOOLS[key] || []) {
         schemas.push({
           type: "function",
@@ -148,6 +158,9 @@ export async function executeTool(name: string, args: Record<string, unknown>): 
   }
   if (name.startsWith("cad_")) {
     return runCadTool(name, args);
+  }
+  if (name.startsWith("studio_")) {
+    return runStudioTool(name, args);
   }
   const key = getSecret("COMPOSIO_API_KEY");
   if (key) {

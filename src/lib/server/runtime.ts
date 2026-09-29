@@ -26,6 +26,7 @@ import {
 } from "./plane";
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
 import { buildCadModel } from "./cad";
+import { buildStudioProduction } from "./studio";
 import {
   createEmail, emailSummary, listEmails, mauticConfigured, sendEmail,
 } from "./mautic";
@@ -243,6 +244,10 @@ async function runTask(id: string) {
     if (pm) { deliverable += `\n\n---\n\n### Projects (${planeConfigured() ? "Plane — live" : "Plane — local"})\n${pm}`; if (!usedTools.includes("plane")) usedTools.unshift("plane"); }
   }
   if (task.dept === "marketing") {
+    if (agent.tools.includes("studio") && allowed.includes("studio")) {
+      const film = await studioForTask(task.title, task.agentId);
+      if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
+    }
     if (agent.tools.includes("mautic") && allowed.includes("mautic")) {
       const email = await emailForTask(task.title);
       if (email) { deliverable += `\n\n---\n\n### Email (${mauticConfigured() ? "Mautic — live" : "Mautic — local"})\n${email}`; if (!usedTools.includes("mautic")) usedTools.unshift("mautic"); }
@@ -405,6 +410,19 @@ async function cadForTask(title: string, agentId: string): Promise<string | null
     const { model } = buildCadModel(title, agentId);
     if (!model) return null;
     return `Built **${model.title}** (${model.solids.length} solids) on [/cad](/cad). ${model.steps[0]?.text || ""}`;
+  } catch {
+    return null;
+  }
+}
+async function studioForTask(title: string, agentId: string): Promise<string | null> {
+  const t = title.toLowerCase();
+  if (!/\b(video|film|reel|trailer|explainer|documentary|talking.?head|montage|spot|commercial|studio|cinematic)\b/.test(t)) {
+    return null;
+  }
+  try {
+    const { model } = buildStudioProduction(title, agentId);
+    if (!model) return null;
+    return `Cut **${model.title}** (${model.shots.length} shots, ${model.runtimeSec}s) on [/studio](/studio). ${model.logline}`;
   } catch {
     return null;
   }

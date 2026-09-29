@@ -26,6 +26,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   bigcapital: ["finance"],
   plane: ["ops", "emails"],
   trypost: ["marketing"],
+  studio: ["marketing"],
   mautic: ["marketing"],
   github: ["ops"],
   cad: ["ops"],
@@ -102,6 +103,9 @@ function applyPolicy(list: Connector[]): Connector[] {
     // Same for marketing (TryPost).
     if (conn.key === "trypost" && status !== "denied") {
       reason = socialLive ? "TryPost — live instance connected" : "TryPost — using local mock posts";
+    }
+    if (conn.key === "studio" && status !== "denied") {
+      reason = "Orbit Studio — text-to-cut on /studio";
     }
     // Same for email marketing (Mautic).
     if (conn.key === "mautic" && status !== "denied") {
