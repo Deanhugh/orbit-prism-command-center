@@ -1,7 +1,16 @@
+import { DEFAULT_TZ, nextAtInZone } from "./zone";
+
 export interface ParsedCadence {
   cadence: string; // human readable
   nextRun: number;
   everyMs: number; // recurrence interval used to compute subsequent runs
+  hour?: number;
+  minute?: number;
+}
+
+export interface CadenceOpts {
+  now?: number;
+  timezone?: string;
 }
 
 const DAYS = [
@@ -26,26 +35,15 @@ function parseTime(text: string): { h: number; m: number } | null {
   return { h, m: min };
 }
 
-function nextAt(h: number, m: number, filter?: (d: Date) => boolean): number {
-  const now = new Date();
-  const d = new Date(now);
-  d.setSeconds(0, 0);
-  d.setHours(h, m, 0, 0);
-  if (d.getTime() <= now.getTime()) d.setDate(d.getDate() + 1);
-  if (filter) {
-    let guard = 0;
-    while (!filter(d) && guard++ < 14) d.setDate(d.getDate() + 1);
-  }
-  return d.getTime();
-}
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
 
 /** Detect and parse a cadence from free text. Returns null if none present. */
-export function parseCadence(text: string): ParsedCadence | null {
+export function parseCadence(text: string, opts: CadenceOpts = {}): ParsedCadence | null {
   const t = text.toLowerCase();
   const time = parseTime(t);
+  const now = opts.now ?? Date.now();
+  const timezone = opts.timezone || DEFAULT_TZ;
 
   // every N minutes (for filming / demos)
   const everyMin = t.match(/every\s+(\d+)\s*min(?:ute)?s?/);
@@ -53,13 +51,13 @@ export function parseCadence(text: string): ParsedCadence | null {
     const n = Math.max(1, parseInt(everyMin[1], 10));
     return {
       cadence: `every ${n} minute${n > 1 ? "s" : ""}`,
-      nextRun: Date.now() + n * 60000,
+      nextRun: now + n * 60000,
       everyMs: n * 60000,
     };
   }
 
   if (/every\s+hour|hourly/.test(t)) {
-    return { cadence: "every hour", nextRun: Date.now() + 3600000, everyMs: 3600000 };
+    return { cadence: "every hour", nextRun: now + 3600000, everyMs: 3600000 };
   }
 
   if (/every\s+weekday|weekdays/.test(t)) {
@@ -67,8 +65,10 @@ export function parseCadence(text: string): ParsedCadence | null {
     const m = time?.m ?? 0;
     return {
       cadence: `every weekday at ${fmt(h, m)}`,
-      nextRun: nextAt(h, m, (d) => d.getDay() >= 1 && d.getDay() <= 5),
+      nextRun: nextAtInZone(h, m, timezone, (d) => d >= 1 && d <= 5, now),
       everyMs: DAY_MS,
+      hour: h,
+      minute: m,
     };
   }
 
@@ -78,8 +78,10 @@ export function parseCadence(text: string): ParsedCadence | null {
       const m = time?.m ?? 0;
       return {
         cadence: `every ${cap(DAYS[i])} at ${fmt(h, m)}`,
-        nextRun: nextAt(h, m, (d) => d.getDay() === i),
+        nextRun: nextAtInZone(h, m, timezone, (d) => d === i, now),
         everyMs: WEEK_MS,
+        hour: h,
+        minute: m,
       };
     }
   }
@@ -89,15 +91,29 @@ export function parseCadence(text: string): ParsedCadence | null {
     const m = time?.m ?? 0;
     return {
       cadence: `every day at ${fmt(h, m)}`,
-      nextRun: nextAt(h, m),
+      nextRun: nextAtInZone(h, m, timezone, undefined, now),
       everyMs: DAY_MS,
+      hour: h,
+      minute: m,
     };
   }
 
   return null;
 }
 
-function fmt(h: number, m: number): string {
+/** Rebuild a weekday/daily cadence after the owner edits the clock time. */
+export function cadenceWithTime(cadence: string, hour: number, minute: number): string {
+  const t = cadence.toLowerCase();
+  const clock = fmt(hour, minute);
+  if (/weekday/.test(t)) return `every weekday at ${clock}`;
+  if (/every\s+day|daily/.test(t)) return `every day at ${clock}`;
+  for (const day of DAYS) {
+    if (new RegExp(`every\\s+${day}`).test(t)) return `every ${cap(day)} at ${clock}`;
+  }
+  return `every weekday at ${clock}`;
+}
+
+export function fmt(h: number, m: number): string {
   const ap = h >= 12 ? "pm" : "am";
   const hh = h % 12 === 0 ? 12 : h % 12;
   return m === 0 ? `${hh}${ap}` : `${hh}:${String(m).padStart(2, "0")}${ap}`;

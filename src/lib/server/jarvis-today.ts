@@ -7,12 +7,10 @@ import { shortId } from "../utils";
 import {
   formatClockHM,
   isSameDay,
-  seedEvents,
   seedHabits,
-  seedTasks,
-  startOfDay,
   type JarvisHub,
 } from "../jarvis-data";
+import { composeBrief } from "./briefs";
 
 export interface TodayLine {
   id: string;
@@ -61,12 +59,9 @@ export function todayBriefingText(userId: string, username: string, now = Date.n
 
 function serializeBriefing(hub: JarvisHub, username: string, now: number): string {
   const owner = hub.profile.ownerName || username;
-  const events = [...seedEvents(), ...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const tasks = seedTasks();
+  const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
   const habits = seedHabits();
   const done = new Set(hub.habitsDone ?? []);
-  const todayTasks = tasks.filter((t) => isSameDay(t.due, now) && t.status !== "done");
-  const overdue = tasks.filter((t) => t.due < startOfDay(now) && t.status !== "done");
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
   const laterEvents = events.filter((e) => e.start > now).slice(0, 5);
   const reminders = (hub.reminders ?? []).filter((r) => !r.done).slice(0, 6);
@@ -83,10 +78,7 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
     `Clock: ${formatClockHM(now)}`,
     `Timezone: ${hub.profile.timezone}`,
     `Tagline: ${hub.profile.tagline}`,
-    todayTasks.length
-      ? `Due today: ${todayTasks.map((t) => `${t.title} (${t.project || "no project"}, ${t.status})`).join("; ")}`
-      : "Due today: none",
-    overdue.length ? `Overdue: ${overdue.map((t) => t.title).join("; ")}` : "Overdue: none",
+    `Office board: see CURRENT OFFICE TASKS below or none yet`,
     todayEvents.length
       ? `Today's calendar: ${todayEvents.map((e) => `${formatClockHM(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`).join("; ")}`
       : "Today's calendar: clear",
@@ -114,12 +106,9 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
 /** Snapshot-grounded reply when the configured model is offline. */
 export function todayFallbackReply(userId: string, username: string, text: string, kind?: string): string {
   const hub = readHub(userId, username);
-  const now = Date.now();
   const owner = hub.profile.ownerName || "there";
-  const events = [...seedEvents(), ...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const tasks = seedTasks();
-  const todayTasks = tasks.filter((t) => isSameDay(t.due, now) && t.status !== "done");
-  const overdue = tasks.filter((t) => t.due < startOfDay(now) && t.status !== "done");
+  const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
+  const now = Date.now();
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
   const next = todayEvents[0] || events.find((e) => e.start > now);
   const reminders = (hub.reminders ?? []).filter((r) => !r.done);
@@ -137,13 +126,10 @@ export function todayFallbackReply(userId: string, username: string, text: strin
   if (wantsBrief) {
     const bits = [
       `Good ${nowHourWord()}, ${owner}.`,
-      overdue.length ? `${overdue.length} slipped.` : "Nothing overdue.",
-      todayTasks.length
-        ? `${todayTasks.length} on the board today, starting with ${todayTasks[0].title}.`
-        : "The task board is clear.",
-      next ? `Next block: ${formatClockHM(next.start)} ${next.title}.` : "Calendar is quiet after this.",
       replies[0] ? `${replies[0].name} is still waiting on you.` : "No one is waiting on a reply.",
+      next ? `Next block: ${formatClockHM(next.start)} ${next.title}.` : "Calendar is quiet after this.",
       reminders[0] ? `Reminder: ${reminders[0].title}.` : "",
+      "Ask Settings → Routines to put Morning Brief and Evening Wrap on a clock.",
     ];
     return bits.filter(Boolean).join(" ");
   }
@@ -215,6 +201,19 @@ export function resolveTodayPrompt(preset: string, text: string): { text: string
 }
 
 export async function answerTodayChat(userId: string, username: string, text: string, kind: string): Promise<string> {
+  if (kind === "brief" || /^(morning brief|evening wrap)\.?$/i.test(text.trim())) {
+    const briefKind = /evening|wrap/i.test(text) ? "evening" : "morning";
+    const { ensureStarted, listOfficeTasks, emitBrief } = await import("./runtime");
+    await ensureStarted();
+    const brief = await composeBrief({
+      kind: briefKind,
+      tasks: listOfficeTasks(),
+      source: "on-demand",
+    });
+    emitBrief(brief);
+    return brief.narrative;
+  }
+
   if (looksLikeOfficeTask(text, kind)) {
     const { jarvisRoute } = await import("./runtime");
     const routed = await jarvisRoute(text);

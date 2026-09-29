@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { DeptId } from "@/lib/types";
-import { addRoutine, createTask } from "@/lib/server/runtime";
+import { addRoutine, createTask, officeTimezone } from "@/lib/server/runtime";
 import { parseCadence } from "@/lib/server/when";
 
 export const runtime = "nodejs";
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   // A cadence in the sentence (or an explicit repeat) becomes a routine.
   const cadenceSource = repeat || title;
-  const parsed = parseCadence(cadenceSource);
+  const parsed = parseCadence(cadenceSource, { timezone: officeTimezone() });
   if (parsed) {
     const cleaned = cleanRoutineTitle(title);
     const routine = addRoutine(cleaned, dept, cadenceSource);

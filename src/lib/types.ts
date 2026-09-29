@@ -96,6 +96,9 @@ export interface Connector {
   depts: DeptId[];
 }
 
+export type RoutineKind = "task" | "brief";
+export type BriefKind = "morning" | "evening";
+
 export interface Routine {
   id: string;
   title: string;
@@ -105,6 +108,31 @@ export interface Routine {
   paused: boolean;
   needsApproval: boolean;
   lastRun?: number;
+  kind?: RoutineKind;
+  briefKind?: BriefKind;
+  timezone?: string;
+  hour?: number;
+  minute?: number;
+}
+
+export interface StoredBrief {
+  id: string;
+  kind: BriefKind;
+  date: string;
+  createdAt: number;
+  timezone: string;
+  owner: string;
+  greeting: string;
+  narrative: string;
+  sections: {
+    today: string[];
+    waitingOnYou: string[];
+    waitingOnThem: string[];
+    tomorrow: string[];
+    doneToday: string[];
+  };
+  notePath?: string;
+  source: "scheduled" | "on-demand";
 }
 
 export interface BrainNode {
@@ -125,6 +153,7 @@ export interface OfficeSnapshot {
   connectors: Connector[];
   tasks: Task[];
   routines: Routine[];
+  briefs: StoredBrief[];
   agents: AgentRuntimeInfo[];
   usage: { session: number; week: number };
 }
@@ -133,6 +162,7 @@ export type OfficeEvent =
   | { type: "snapshot"; snapshot: OfficeSnapshot }
   | { type: "task"; task: Task }
   | { type: "routine"; routine: Routine }
+  | { type: "brief"; brief: StoredBrief }
   | { type: "agent"; agent: AgentRuntimeInfo }
   | { type: "message"; message: AgentMessage }
   | { type: "connector_pulse"; key: string };

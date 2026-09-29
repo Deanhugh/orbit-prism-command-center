@@ -13,7 +13,6 @@ import {
   isSameDay,
   seedEvents,
   seedHabits,
-  seedTasks,
   startOfDay,
   type JarvisEvent,
   type JarvisTask,
@@ -24,6 +23,9 @@ import { DeckFollowups } from "./DeckFollowups";
 import { DeckWork } from "./DeckWork";
 import { DeckKnowledge } from "./DeckKnowledge";
 import { TodayJarvis } from "./TodayJarvis";
+import { BriefBody } from "./BriefBody";
+import { useOrbitInit } from "@/lib/use-orbit-init";
+import type { StoredBrief } from "@/lib/types";
 
 type TaskTab = "today" | "overdue" | "upcoming" | "all";
 
@@ -36,20 +38,30 @@ export function JarvisDashboard({
 }) {
   const { hub, save } = useJarvisHub(initialHub, username);
   const officeTasks = useOffice((s) => s.tasks);
+  const officeBriefs = useOffice((s) => s.briefs);
+  useOrbitInit();
   const [now, setNow] = useState(() => Date.now());
   const [tab, setTab] = useState<TaskTab>("today");
   const [briefTab, setBriefTab] = useState<"morning" | "evening">("morning");
+  const [fetchedBriefs, setFetchedBriefs] = useState<StoredBrief[]>([]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    fetch("/api/briefs")
+      .then((r) => r.json())
+      .then((d) => setFetchedBriefs(d.briefs || []))
+      .catch(() => {});
+  }, []);
+
   const owner = hub?.profile.ownerName || prettyName(username);
   const greet = greetingWord(new Date(now));
   const progress = dayProgress(new Date(now));
 
-  const tasks = useMemo(() => mergeTasks(officeTasks, seedTasks()), [officeTasks]);
+  const tasks = useMemo(() => mergeTasks(officeTasks), [officeTasks]);
   const events = useMemo(
     () => [...seedEvents(), ...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
     [hub?.extraEvents],
@@ -67,6 +79,8 @@ export function JarvisDashboard({
   const dueToday = tasks.filter((t) => isSameDay(t.due, now) && t.status !== "done").length;
   const overdue = tasks.filter((t) => t.due < startOfDay(now) && t.status !== "done").length;
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
+  const briefs = officeBriefs.length ? officeBriefs : fetchedBriefs;
+  const shownBrief = briefs.find((b) => b.kind === briefTab) || null;
 
   async function toggleHabit(id: string) {
     if (!hub) return;
@@ -201,24 +215,39 @@ export function JarvisDashboard({
           {briefTab === "morning" ? "Morning brief" : "Evening wrap"}
         </h2>
         <p className="mt-1 text-[13px] text-ink-soft">
-          Good {briefTab === "morning" ? "morning" : "evening"}, {owner}.
+          {shownBrief?.greeting || `Good ${briefTab === "morning" ? "morning" : "evening"}, ${owner}.`}
         </p>
-        <div className="mt-5 grid gap-6 sm:grid-cols-2">
-          <div>
-            <p className="hud-label">Today · Jarvis</p>
-            <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
-              <span className="font-semibold text-ink">{dueToday} on the board today.</span>
-              {todayEvents[0] ? ` Next: ${formatClockHM(todayEvents[0].start)} ${todayEvents[0].title}.` : ""}
-            </p>
+        {shownBrief ? (
+          <div className="mt-5">
+            <BriefBody brief={shownBrief} compact />
           </div>
-          <div>
-            <p className="hud-label">Waiting on you</p>
-            <ul className="mt-2 space-y-2 text-[13px] leading-relaxed">
-              <li>Wei Chen’s homepage mockups need sign-off before the Friday deadline.</li>
-              <li>Elena’s onboarding checklist is ready for approval.</li>
-            </ul>
+        ) : (
+          <div className="mt-5 grid gap-6 sm:grid-cols-2">
+            <div>
+              <p className="hud-label">Today · Jarvis</p>
+              <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
+                <span className="font-semibold text-ink">{dueToday} on the board today.</span>
+                {todayEvents[0] ? ` Next: ${formatClockHM(todayEvents[0].start)} ${todayEvents[0].title}.` : ""}
+              </p>
+              <p className="mt-3 text-[12px] text-ink-soft">
+                Scheduled loops live in Settings → Routines. Run Morning Brief or Evening Wrap there, or they write themselves at the clock time.
+              </p>
+            </div>
+            <div>
+              <p className="hud-label">Waiting on you</p>
+              <ul className="mt-2 space-y-2 text-[13px] leading-relaxed">
+                {(hub?.replies ?? []).filter((r) => !r.done).slice(0, 3).map((r) => (
+                  <li key={r.id}>
+                    {r.name} — {r.note}
+                  </li>
+                ))}
+                {(hub?.replies ?? []).filter((r) => !r.done).length === 0 ? (
+                  <li className="text-ink-soft">Nothing waiting on a reply.</li>
+                ) : null}
+              </ul>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <section className="hud-panel p-4 lg:col-span-4">
@@ -328,19 +357,16 @@ function prettyName(username: string) {
 
 function mergeTasks(
   office: { id: string; title: string; status: string; progress: number; updatedAt: number }[],
-  seed: JarvisTask[],
 ): JarvisTask[] {
-  const fromOffice: JarvisTask[] = office.slice(0, 8).map((t) => ({
+  return office.slice(0, 12).map((t) => ({
     id: t.id,
     title: t.title,
     project: "Office",
     due: t.updatedAt || Date.now(),
     progress: t.progress,
     status: t.status === "done" ? "done" : t.status === "in_progress" ? "in_progress" : t.status === "waiting_approval" ? "waiting" : "todo",
-    priority: "normal",
+    priority: "normal" as const,
   }));
-  const seen = new Set(fromOffice.map((t) => t.title.toLowerCase()));
-  return [...fromOffice, ...seed.filter((t) => !seen.has(t.title.toLowerCase()))];
 }
 
 function groupByProject(tasks: JarvisTask[]): [string, JarvisTask[]][] {
