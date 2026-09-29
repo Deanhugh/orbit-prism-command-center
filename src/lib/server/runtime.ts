@@ -25,6 +25,7 @@ import {
   createWorkItem, listWorkItems, planeConfigured, pmSummary, updateWorkItem, type StateGroup,
 } from "./plane";
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
+import { buildStudioProduction } from "./studio";
 import {
   createEmail, emailSummary, listEmails, mauticConfigured, sendEmail,
 } from "./mautic";
@@ -241,6 +242,10 @@ async function runTask(id: string) {
     if (pm) { deliverable += `\n\n---\n\n### Projects (${planeConfigured() ? "Plane — live" : "Plane — local"})\n${pm}`; if (!usedTools.includes("plane")) usedTools.unshift("plane"); }
   }
   if (task.dept === "marketing") {
+    if (agent.tools.includes("studio") && allowed.includes("studio")) {
+      const film = await studioForTask(task.title, task.agentId);
+      if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
+    }
     if (agent.tools.includes("mautic") && allowed.includes("mautic")) {
       const email = await emailForTask(task.title);
       if (email) { deliverable += `\n\n---\n\n### Email (${mauticConfigured() ? "Mautic — live" : "Mautic — local"})\n${email}`; if (!usedTools.includes("mautic")) usedTools.unshift("mautic"); }
@@ -389,6 +394,19 @@ async function socialForTask(title: string, agentName: string): Promise<string |
     const lines = sum.byState.filter((s) => s.count > 0).map((s) => `- ${s.label}: ${s.count}`);
     return [`Content calendar (${sum.activeChannels}/${sum.channels} channels active, ${sum.totalPosts} posts):`, ...lines, `- **Scheduled next 7 days:** ${sum.scheduledNext7}`].join("\n");
   } catch { return null; }
+}
+async function studioForTask(title: string, agentId: string): Promise<string | null> {
+  const t = title.toLowerCase();
+  if (!/\b(video|film|reel|trailer|explainer|documentary|talking.?head|montage|spot|commercial|studio|cinematic)\b/.test(t)) {
+    return null;
+  }
+  try {
+    const { model } = buildStudioProduction(title, agentId);
+    if (!model) return null;
+    return `Cut **${model.title}** (${model.shots.length} shots, ${model.runtimeSec}s) on [/studio](/studio). ${model.logline}`;
+  } catch {
+    return null;
+  }
 }
 async function emailForTask(title: string): Promise<string | null> {
   const t = title.toLowerCase();

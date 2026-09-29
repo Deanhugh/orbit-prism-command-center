@@ -141,6 +141,17 @@ Sign into Twenty, then open `/sales`. The board is **live** (not mock) when thos
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
+### Studio — `/studio` (text to cut)
+
+Orbit-native video production desk. Left: prompt + Brand / Content / Social agent log. Right: a playable slate and timeline. This is **not** a vendored [OpenMontage](https://github.com/calesthio/OpenMontage) install (AGPLv3 Python + Remotion + FFmpeg, agent-driven, no HTTP API). Agents emit a named shot list the browser can play.
+
+- Page: https://command-center-production-e72e.up.railway.app/studio
+- Agents: Brand (`mk_gfx`), Content Strategist (`mk_lead`), Social Media (`mk_social`) have the `studio` tool (`studio_produce`, `studio_list`, `studio_get`)
+- Named cuts: product film, explainer, trailer, vertical reel, talking-head, documentary. Other prompts get a five-shot branded spot.
+- Productions persist in `data/studio-productions.json` on the host volume.
+
+Prompt on the page yourself, or assign a Marketing task that mentions video / reel / trailer / explainer — the run loop writes the cut and links `/studio`.
+
 ### TryPost — `/marketing` (blocked on image)
 
 Railway project **Orbit Prism TryPost** exists (app + Postgres + Redis). `ghcr.io/trypostit/trypost:latest` and `v1.0.8` crash on boot (`Laravel\\Pail\\PailServiceProvider` not found). Leave `/marketing` on mock until a working image is published. Then set `TRYPOST_API_URL`, `TRYPOST_APP_URL`, `TRYPOST_API_KEY`.
