@@ -1,8 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { primeJarvisSpeech, speakJarvis, stopJarvisSpeech } from "@/lib/speak-jarvis";
+
+const FISH_SITE = "https://fish.audio";
+const FISH_KEYS = "https://fish.audio/app/api-keys";
+
+function fishVoiceHref(id: string) {
+  return `${FISH_SITE}/m/${encodeURIComponent(id)}/`;
+}
 
 interface FishVoice {
   id: string;
@@ -128,18 +136,24 @@ export function VoiceSettings() {
   return (
     <div className="mx-auto max-w-[900px] space-y-4">
       <section className="rounded-lg border border-line bg-panel p-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className={cn("h-2 w-2 rounded-full", status?.hasKey ? "bg-emails" : "bg-finance")} />
           <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Jarvis voice · Fish Audio</h2>
           <span className="text-[10px] text-ink-soft">{status?.reason || "Loading…"}</span>
+          <a
+            href={FISH_SITE}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center gap-1 rounded-md border border-line px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-ops hover:bg-canvas-2"
+          >
+            Open Fish Audio
+            <ExternalLink size={11} />
+          </a>
         </div>
         <p className="mt-2 text-[12px] leading-relaxed text-ink-soft">
-          Morning Brief, Evening Wrap, and Today speak through a{" "}
-          <a className="underline" href="https://fish.audio/" target="_blank" rel="noreferrer">
-            Fish Audio
-          </a>{" "}
-          library voice — not the browser&apos;s default. Create a key at{" "}
-          <a className="underline" href="https://fish.audio/app/api-keys" target="_blank" rel="noreferrer">
+          Morning Brief, Evening Wrap, and Today speak through a Fish Audio library voice — not the
+          browser&apos;s default. Create a key at{" "}
+          <a className="underline" href={FISH_KEYS} target="_blank" rel="noreferrer">
             fish.audio/app/api-keys
           </a>
           , paste it here (or set <code>FISH_API_KEY</code> on Railway), then pick a voice. Browser speech stays as fallback if Fish is offline.
@@ -199,6 +213,17 @@ export function VoiceSettings() {
             Current: <strong className="text-ink">{status?.voice.title || "JARVIS"}</strong>
             {!status?.hasKey ? " · browser fallback until a key is saved" : ""}
           </span>
+          {status?.voice.referenceId ? (
+            <a
+              href={fishVoiceHref(status.voice.referenceId)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ops hover:underline"
+            >
+              Open current voice
+              <ExternalLink size={10} />
+            </a>
+          ) : null}
         </div>
         {note ? (
           <p className={cn("mt-2 text-[11px] font-medium", note.ok ? "text-emails" : "text-finance")}>{note.text}</p>
@@ -206,9 +231,20 @@ export function VoiceSettings() {
       </section>
 
       <section className="rounded-lg border border-line bg-panel p-4">
-        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Library</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Library</h2>
+          <a
+            href={FISH_SITE}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ops hover:underline"
+          >
+            Browse fish.audio
+            <ExternalLink size={10} />
+          </a>
+        </div>
         <p className="mt-1 text-[11px] text-ink-soft">
-          Starter voices are public Fish library models. Search the rest of the English catalog after the key is saved.
+          Starter voices are public Fish library models. Open any card on Fish Audio to hear the original, or search the rest of the English catalog after the key is saved.
         </p>
         <form
           className="mt-3 flex gap-1"
@@ -235,19 +271,32 @@ export function VoiceSettings() {
           {voices.map((v) => {
             const on = v.id === selected;
             return (
-              <button
+              <div
                 key={v.id}
-                type="button"
-                onClick={() => void pickVoice(v)}
                 className={cn(
-                  "rounded-lg border px-3 py-2 text-left",
-                  on ? "border-cyan bg-cyan/10" : "border-line hover:border-ink/40",
+                  "rounded-lg border px-3 py-2",
+                  on ? "border-cyan bg-cyan/10" : "border-line",
                 )}
               >
-                <span className="block text-[12px] font-semibold">{v.title}</span>
-                {v.description ? <span className="mt-0.5 block text-[11px] text-ink-soft">{v.description}</span> : null}
-                {on ? <span className="mt-1 block text-[9px] uppercase tracking-wide text-cyan">Selected</span> : null}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void pickVoice(v)}
+                  className="w-full text-left"
+                >
+                  <span className="block text-[12px] font-semibold">{v.title}</span>
+                  {v.description ? <span className="mt-0.5 block text-[11px] text-ink-soft">{v.description}</span> : null}
+                  {on ? <span className="mt-1 block text-[9px] uppercase tracking-wide text-cyan">Selected</span> : null}
+                </button>
+                <a
+                  href={fishVoiceHref(v.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ops hover:underline"
+                >
+                  Open on Fish Audio
+                  <ExternalLink size={10} />
+                </a>
+              </div>
             );
           })}
         </div>
