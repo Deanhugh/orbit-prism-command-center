@@ -166,8 +166,8 @@ export function MessagesApp({ username }: { username: string }) {
     return rows;
   }, [providers, modelsByProvider, current.model, current.provider]);
 
-  // Skills available to the currently-open agent/department. The skills API
-  // returns agent *names*, so match on the conversation's agent name or its dept.
+  // Skills available to the currently-open desk. The skills API returns agent
+  // *names*. Department is grouping only when a playbook names specific desks.
   const activeAgentId = active && active.kind === "dm" ? active.agentIds[0] : undefined;
   const activeAgentName = active && active.kind === "dm" && activeAgentId !== "jarvis" ? active.title : undefined;
   const activeDeptId = active?.deptId;
@@ -493,12 +493,13 @@ export function MessagesApp({ username }: { username: string }) {
           <div className="overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
             <div className="flex items-end gap-2 overflow-visible">
               <ComposerPlus
-                skills={allSkills.filter((s) =>
-                  isJarvis ||
-                  s.agents?.includes("all") ||
-                  (activeAgentName ? s.agents?.includes(activeAgentName) : false) ||
-                  (activeDeptId ? s.department === activeDeptId : false),
-                )}
+                skills={allSkills.filter((s) => {
+                  if (isJarvis || s.agents?.includes("all")) return true;
+                  if (activeAgentName && s.agents?.includes(activeAgentName)) return true;
+                  const unnamed = !s.agents?.length;
+                  if (unnamed && activeDeptId && (s.department === activeDeptId || s.department === "all")) return true;
+                  return false;
+                })}
                 onPickSkill={(name) => {
                   pickSkill(name);
                   setInput((v) => (v ? `${v} ` : "") + `Use the ${name} skill: `);
