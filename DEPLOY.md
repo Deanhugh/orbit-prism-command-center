@@ -39,6 +39,7 @@ Keep it running so routines fire on schedule (`pm2` or `launchd`). Local Ollama 
    | `XAI_API_KEY` | for Grok | |
    | `OPENROUTER_API_KEY` | optional | Claude / GPT / Grok through one key. |
    | `NOTION_TOKEN` | optional | Notion internal integration token if you prefer env over Settings. |
+   | `APIFY_TOKEN` | optional | Apify API token if you prefer env over Settings → MCP. |
    | `COMPOSIO_API_KEY` | optional | Extra SaaS connectors. |
    | `ORBIT_MODE=demo` | no | Only if you want simulated agent work. Leave unset for live providers. |
 

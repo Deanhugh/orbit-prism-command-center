@@ -37,6 +37,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   trypost: ALL_DEPTS,
   studio: ALL_DEPTS,
   github: ALL_DEPTS,
+  apify: ALL_DEPTS,
   cad: ALL_DEPTS,
 };
 

@@ -522,7 +522,7 @@ function pickDept(text: string): DeptId {
   if (/\b(deal|lead|prospect|pipeline|crm|proposal|outbound|inbound)\b/.test(t)) return "sales";
   if (/\b(ticket|sprint|backlog|milestone|plane|pmo|work item|project plan)\b/.test(t)) return "emails";
   if (/\b(account|retention|onboard|renewal|client health)\b/.test(t)) return "delivery";
-  if (/\b(post|social|seo|brand|content|campaign|trypost)\b/.test(t)) return "marketing";
+  if (/\b(post|social|seo|brand|content|campaign|trypost|scrape|apify|instagram|tiktok)\b/.test(t)) return "marketing";
   let best: DeptId = "ops"; let bestScore = -1;
   for (const d of DEPARTMENTS) {
     const hay = (d.name + " " + AGENTS_BY_DEPT[d.id].map((a) => a.role + " " + a.does).join(" ")).toLowerCase();

@@ -98,6 +98,8 @@ export function Connectors() {
   }
 
   const notion = data?.connectors.find((c) => c.key === "notion");
+  const apify = data?.connectors.find((c) => c.key === "apify");
+  const apifyUrl = MCP_CATALOG.find((i) => i.id === "apify")?.command || "https://mcp.apify.com";
 
   return (
     <div className="space-y-3">
@@ -111,11 +113,16 @@ export function Connectors() {
         row={notion}
         onSaved={load}
       />
+      <ApifyPanel
+        row={apify}
+        url={apifyUrl}
+        onSaved={load}
+      />
 
       <section id="browse-mcp" className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Browse MCP</h2>
         <p className="mb-3 text-[11px] text-ink-soft">
-          Remote apps (Notion, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
+          Remote apps (Notion, Apify, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
         </p>
         <McpBrowse
           catalog={data?.catalog || []}
@@ -180,7 +187,27 @@ function NotionPanel({ row, onSaved }: { row?: ConnRow; onSaved: () => void }) {
         <a className="underline" href="https://www.notion.so/my-integrations" target="_blank" rel="noreferrer">notion.so/my-integrations</a>
         {" "}and share pages with it, or use Connect with Notion.
       </p>
-      <AuthActions name="Notion" url="https://mcp.notion.com/mcp" auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} />
+      <AuthActions name="Notion" url="https://mcp.notion.com/mcp" auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} placeholder="Bearer token (Notion ntn_ / secret_ …)" />
+    </section>
+  );
+}
+
+function ApifyPanel({ row, url, onSaved }: { row?: ConnRow; url: string; onSaved: () => void }) {
+  const live = row?.status === "connected";
+  return (
+    <section className="rounded-lg border border-line bg-panel p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : "bg-finance")} />
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Apify — live remote MCP</h2>
+        <span className="text-[10px] text-ink-soft">{row?.reason || "Not connected yet"}</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+        Agents scrape websites and social media through Apify Store Actors (web fetch, Instagram, Google search, plus Store search).
+        Same connection type as Notion: HTTP URL + OAuth or a token. Create a token at{" "}
+        <a className="underline" href="https://console.apify.com/settings/integrations" target="_blank" rel="noreferrer">console.apify.com → Integrations</a>
+        . Actor runs use your Apify credits.
+      </p>
+      <AuthActions name="Apify" url={url} auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} placeholder="APIFY_TOKEN from Apify Console" />
     </section>
   );
 }
@@ -191,12 +218,14 @@ function AuthActions({
   auth,
   onSaved,
   hasToken,
+  placeholder,
 }: {
   name: string;
   url?: string;
   auth?: string;
   onSaved: () => void;
   hasToken?: boolean;
+  placeholder?: string;
 }) {
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -241,7 +270,7 @@ function AuthActions({
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}
-          placeholder={hasToken ? "•••• token saved — paste to replace" : "Bearer token (Notion ntn_ / secret_ …)"}
+          placeholder={hasToken ? "•••• token saved — paste to replace" : (placeholder || "Bearer token")}
           className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]"
         />
         <button

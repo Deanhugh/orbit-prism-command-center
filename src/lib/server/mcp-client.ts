@@ -61,6 +61,7 @@ async function rpc(
   body: Record<string, unknown>,
   token?: string,
   sessionId?: string,
+  timeoutMs = TIMEOUT_MS,
 ): Promise<RpcResult> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -71,7 +72,7 @@ async function rpc(
   if (sessionId) headers["Mcp-Session-Id"] = sessionId;
 
   const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), TIMEOUT_MS);
+  const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -200,7 +201,8 @@ export async function callMcpTool(
   session: McpSession,
   name: string,
   args: Record<string, unknown>,
-): Promise<{ ok: boolean; text: string }> {
+  opts?: { timeoutMs?: number },
+): Promise<{ ok: boolean; text: string; result?: unknown }> {
   const res = await rpc(
     session.url,
     {
@@ -211,9 +213,10 @@ export async function callMcpTool(
     },
     session.token,
     session.sessionId,
+    opts?.timeoutMs,
   );
   if (!res.ok) return { ok: false, text: res.error || "tool call failed" };
-  return { ok: true, text: stringifyToolResult(res.result) };
+  return { ok: true, text: stringifyToolResult(res.result), result: res.result };
 }
 
 export function argsForSearchTool(tool: McpTool, query: string): Record<string, unknown> {
@@ -245,6 +248,36 @@ export function pickSearchTools(tools: McpTool[]): McpTool[] {
     .filter((x) => x.n > 0)
     .sort((a, b) => b.n - a.n)
     .map((x) => x.t);
+}
+
+export function parseJsonFromTool(text: string, result?: unknown): Record<string, unknown> | null {
+  if (result && typeof result === "object") {
+    const r = result as { structuredContent?: unknown; content?: Array<{ text?: string }> };
+    if (r.structuredContent && typeof r.structuredContent === "object") {
+      return r.structuredContent as Record<string, unknown>;
+    }
+    if (Array.isArray(r.content)) {
+      for (const c of r.content) {
+        if (c.text) {
+          const inner = parseJsonFromTool(c.text);
+          if (inner) return inner;
+        }
+      }
+    }
+  }
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as Record<string, unknown>;
+  } catch {
+    const m = trimmed.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      return JSON.parse(m[0]) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
 }
 
 export function stringifyToolResult(result: unknown): string {

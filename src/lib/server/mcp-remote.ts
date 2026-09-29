@@ -10,6 +10,7 @@ import {
   type McpTool,
 } from "./mcp-client";
 import { isNotionMcpUrl, looksLikeNotionToken, notionRestProbe, notionRestSearch } from "./notion-rest";
+import { isApifyConnector, looksLikeScrapeQuery, runApifyForQuery } from "./mcp-apify";
 
 const probeCache = new Map<string, { at: number; value: McpProbe }>();
 
@@ -74,6 +75,14 @@ export async function searchRemoteConnector(conn: CustomConnector, query: string
   const probe = await probeRemoteConnector(conn);
   if (!probe.ok) return null;
 
+  if (isApifyConnector(conn) && probe.session) {
+    try {
+      return await runApifyForQuery(probe.session, query);
+    } catch (err) {
+      return err instanceof Error ? err.message : "Apify request failed";
+    }
+  }
+
   if (probe.session) {
     const tools = pickSearchTools(probe.session.tools.length ? probe.session.tools : probe.tools);
     const tool = tools[0];
@@ -98,6 +107,7 @@ export async function mcpContextForQuery(query: string): Promise<{ key: string; 
   if (q.length < 3) return [];
   const out: { key: string; name: string; text: string }[] = [];
   for (const conn of remoteConnectors()) {
+    if (isApifyConnector(conn) && !looksLikeScrapeQuery(q) && !/\bapify\b/i.test(q)) continue;
     const text = await searchRemoteConnector(conn, q);
     if (text) out.push({ key: mcpKey(conn.name), name: conn.name, text: text.slice(0, 2500) });
   }

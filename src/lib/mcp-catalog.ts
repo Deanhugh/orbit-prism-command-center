@@ -23,6 +23,17 @@ export const MCP_CATALOG: McpCatalogItem[] = [
     hint: "Connect with Notion (OAuth) or paste an internal integration token (ntn_ / secret_). Share pages with the integration.",
   },
   {
+    id: "apify",
+    name: "Apify",
+    description: "Scrape websites and social media via Apify Store Actors — live remote MCP on Railway",
+    command:
+      "https://mcp.apify.com?tools=actors,apify/rag-web-browser,apify/web-fetch,apify/instagram-scraper,apify/google-search-scraper",
+    transport: "http",
+    remote: true,
+    auth: "oauth",
+    hint: "Connect with Apify (OAuth) or paste APIFY_TOKEN from console.apify.com → Settings → Integrations. Runs use your Apify credits.",
+  },
+  {
     id: "github",
     name: "GitHub",
     description: "Repos, issues, and pull requests — live remote MCP",

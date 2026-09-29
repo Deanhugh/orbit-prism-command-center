@@ -35,7 +35,7 @@ async function payload() {
       ? status.reason
       : connectors.some((c) => c.kind === "remote" && c.status === "connected")
         ? "Remote MCP live on this host"
-        : "Add a remote MCP (Notion first) with OAuth or a token — npx commands are not live on Railway.",
+        : "Add a remote MCP (Notion or Apify) with OAuth or a token — npx commands are not live on Railway.",
     claude: status,
     connectors,
     deny: cfg.mcp.deny,

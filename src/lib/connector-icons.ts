@@ -75,6 +75,7 @@ const COLOR: Record<string, string> = {
   bigcapital: "#0f766e",
   plane: "#3f76ff",
   trypost: "#e8562e",
+  apify: "#96d000",
   mautic: "#4e5e9e",
 };
 

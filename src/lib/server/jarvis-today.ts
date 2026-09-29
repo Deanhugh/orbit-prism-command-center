@@ -232,7 +232,7 @@ export async function answerTodayChat(userId: string, username: string, text: st
   if (!status.ok) return todayFallbackReply(userId, username, text, kind);
 
   let mcpBlock = "";
-  if (/\b(notion|wiki|workspace page|knowledge base)\b/i.test(text)) {
+  if (/\b(notion|wiki|workspace page|knowledge base|apify|scrape|instagram|tiktok|facebook|linkedin|serp|google search|website|https?:\/\/)\b/i.test(text)) {
     try {
       const { formatMcpContext, mcpContextForQuery } = await import("./mcp-remote");
       mcpBlock = formatMcpContext(await mcpContextForQuery(text));

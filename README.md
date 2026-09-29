@@ -130,9 +130,19 @@ On Railway, catalog apps are live only when they are **remote HTTP/SSE** servers
 4. Click **Test**. Green means agents can search the workspace on live tasks.
 5. Share Notion pages with the integration if search returns nothing.
 
-The same card (URL + OAuth or token + Test) is how GitHub, Stripe, and any custom remote MCP connect. OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens sit in `/app/data/secrets.json` on the volume.
+The same card (URL + OAuth or token + Test) is how GitHub, Stripe, Apify, and any custom remote MCP connect. OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens sit in `/app/data/secrets.json` on the volume.
 
 Optional env: `NOTION_TOKEN` or `NOTION_API_KEY` (same as pasting the token in Settings).
+
+### Apify (web + social scrape)
+
+Remote Streamable HTTP MCP at `https://mcp.apify.com` — not the Apify CLI, not `npx`, not `/sse`. After deploy:
+
+1. Open **Settings → MCP** → **Apify — live remote MCP**.
+2. Paste `APIFY_TOKEN` from [Apify Console → Integrations](https://console.apify.com/settings/integrations) and **Save token** (Bearer is the Railway path). **Connect with OAuth** is optional in the browser.
+3. Click **Test**. Agents then run scrapers (web fetch, Instagram, Google search) only on live tasks that mention a URL, scrape, or a social network — not on every office task.
+
+Runs bill your Apify account (capped per run). Optional env: `APIFY_TOKEN` (same Bearer header as Settings). Rental and full-permission Actors stay excluded.
 
 ## Department platforms on Railway
 

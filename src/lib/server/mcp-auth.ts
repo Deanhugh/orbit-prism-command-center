@@ -14,7 +14,8 @@ export function mcpAccessToken(key: string): string | undefined {
   return (
     getSecret(`${p}_TOKEN`) ||
     getSecret(`${p}_ACCESS_TOKEN`) ||
-    (k === "notion" ? getSecret("NOTION_TOKEN") || getSecret("NOTION_API_KEY") : undefined)
+    (k === "notion" ? getSecret("NOTION_TOKEN") || getSecret("NOTION_API_KEY") : undefined) ||
+    (k === "apify" ? getSecret("APIFY_TOKEN") : undefined)
   );
 }
 
