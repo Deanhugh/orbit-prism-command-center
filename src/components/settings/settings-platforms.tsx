@@ -10,7 +10,6 @@ export function PlatformConnections() {
       <FinanceConnection />
       <PmoConnection />
       <MarketingConnection />
-      <EmailConnection />
     </>
   );
 }
@@ -244,63 +243,3 @@ function MarketingConnection() {
   );
 }
 
-interface EmailCfg { mode: "live" | "mock"; baseUrl: string; appUrl?: string; hasKey: boolean; auth: string; reachable?: boolean; reason?: string }
-function EmailConnection() {
-  const [cfg, setCfg] = useState<EmailCfg | null>(null);
-  const [baseUrl, setBaseUrl] = useState("");
-  const [appUrl, setAppUrl] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const load = () => fetch("/api/email/config").then((r) => r.json()).then((d) => { setCfg(d); setBaseUrl(d.baseUrl || ""); setAppUrl(d.appUrl || ""); });
-  useEffect(() => { load(); }, []);
-
-  async function save() {
-    setSaving(true);
-    const res = await fetch("/api/email/config", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ baseUrl, appUrl, ...(clientId ? { clientId } : {}), ...(clientSecret ? { clientSecret } : {}) }),
-    });
-    const d = await res.json();
-    setCfg(d); setClientId(""); setClientSecret(""); setSaving(false);
-  }
-
-  const live = cfg?.mode === "live" && cfg?.reachable !== false;
-  return (
-    <section className="rounded-lg border border-line bg-panel p-4">
-      <div className="flex items-center gap-2">
-        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : cfg?.mode === "live" ? "bg-finance" : "bg-sales")} />
-        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Email — Mautic</h2>
-        <span className="text-[10px] text-ink-soft">{cfg ? (cfg.mode === "live" ? `live · ${cfg.reason || ""}` : "using local mock emails") : ""}</span>
-        <a href="/email" className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-ops">Open Email →</a>
-      </div>
-      <p className="mt-1 text-[11px] text-ink-soft">
-        Connect your <a className="underline" href="https://github.com/mautic/mautic" target="_blank" rel="noreferrer">Mautic</a> instance so the Email Marketing agent runs real campaigns, contacts &amp; segments. Enable the API in Mautic and create OAuth2 API credentials (client_credentials).
-      </p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <div>
-          <label className="text-[9px] uppercase tracking-wide text-ink-soft">Base URL</label>
-          <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="https://mautic.yourdomain.com" className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
-        </div>
-        <div>
-          <label className="text-[9px] uppercase tracking-wide text-ink-soft">App URL (for embed / “Open in Mautic”)</label>
-          <input value={appUrl} onChange={(e) => setAppUrl(e.target.value)} placeholder="same as base URL, usually" className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
-        </div>
-        <div>
-          <label className="text-[9px] uppercase tracking-wide text-ink-soft">OAuth2 Client ID {cfg?.hasKey ? "(set)" : ""}</label>
-          <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder={cfg?.hasKey ? "•••• saved" : "client id"} className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
-        </div>
-        <div>
-          <label className="text-[9px] uppercase tracking-wide text-ink-soft">OAuth2 Client Secret</label>
-          <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder={cfg?.hasKey ? "•••• saved" : "client secret"} className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]" />
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-2">
-        <button onClick={save} disabled={saving} className="rounded-md bg-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-canvas disabled:opacity-40">{saving ? "Saving…" : "Save & test"}</button>
-        <span className="text-[10px] text-ink-soft">Stored locally in <code>data/secrets.json</code> (gitignored). Basic Auth via <code>MAUTIC_BASIC_USER/PASS</code> env is also supported.</span>
-      </div>
-    </section>
-  );
-}

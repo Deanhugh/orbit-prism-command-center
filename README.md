@@ -118,7 +118,7 @@ Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staf
 
 ## Settings
 
-Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar. Department platforms (Twenty, Bigcapital, Plane, TryPost, Mautic) live under **Settings → MCP**.
+Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar. Department platforms (Twenty, Bigcapital, Plane, TryPost) live under **Settings → MCP**. Office **Live** mode follows the provider you pick there (OpenRouter recommended on Railway) — it is not tied to the Claude CLI.
 
 ## Department platforms on Railway
 

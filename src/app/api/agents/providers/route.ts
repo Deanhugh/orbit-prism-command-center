@@ -12,6 +12,8 @@ import {
   type ProviderId,
 } from "@/lib/server/providers";
 import { listModels, providerStatus } from "@/lib/server/llm";
+import { clearOfficeModeCache } from "@/lib/server/office-mode";
+import { refreshMode } from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,9 +63,11 @@ export async function PUT(req: NextRequest) {
     setSecret(String(body.secretName), String(body.secretValue));
   }
   const cfg = saveAgentsConfig(patch);
+  clearOfficeModeCache();
   const modelsFor = (body.modelsFor as ProviderId) || cfg.provider;
   const models = await listModels(modelsFor);
   const testedId = body.testId && PROVIDER_IDS.includes(body.testId) ? (body.testId as ProviderId) : null;
   const test = testedId ? await providerStatus(testedId) : null;
+  try { await refreshMode(); } catch { /* office may not have started */ }
   return NextResponse.json({ config: cfg, models, test: test ? { id: testedId, ...test } : null });
 }

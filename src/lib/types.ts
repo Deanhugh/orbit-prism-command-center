@@ -120,6 +120,8 @@ export interface OfficeSnapshot {
   mode: RunMode;
   modeReason: string;
   model: string;
+  provider?: string;
+  providerLabel?: string;
   connectors: Connector[];
   tasks: Task[];
   routines: Routine[];

@@ -17,6 +17,7 @@ interface OfficeStore {
   mode: RunMode;
   modeReason: string;
   model: string;
+  providerLabel: string;
   connectors: Connector[];
   tasks: Task[];
   routines: Routine[];
@@ -68,6 +69,7 @@ export const useOffice = create<OfficeStore>((set, get) => ({
   mode: "demo",
   modeReason: "connecting…",
   model: "sonnet",
+  providerLabel: "",
   connectors: [],
   tasks: [],
   routines: [],
@@ -111,6 +113,7 @@ export const useOffice = create<OfficeStore>((set, get) => ({
           mode: s.mode,
           modeReason: s.modeReason,
           model: s.model,
+          providerLabel: s.providerLabel || "",
           connectors: s.connectors,
           tasks: s.tasks,
           routines: s.routines,
@@ -159,7 +162,7 @@ export const useOffice = create<OfficeStore>((set, get) => ({
   refreshMode: async () => {
     const res = await fetch("/api/office", { method: "POST" });
     const s = await res.json();
-    set({ mode: s.mode, modeReason: s.modeReason, connectors: s.connectors });
+    set({ mode: s.mode, modeReason: s.modeReason, model: s.model, providerLabel: s.providerLabel || "", connectors: s.connectors });
   },
 
   routineAction: async (id, action) => {

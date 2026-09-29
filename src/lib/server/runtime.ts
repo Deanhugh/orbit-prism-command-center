@@ -9,8 +9,10 @@ import {
 } from "../office-data";
 import { shortId } from "../utils";
 import { loadConfig } from "./config";
-import { claudePrompt, claudeStatus } from "./claude";
 import { getConnectors, connectorsForDept } from "./mcp";
+import { completePrompt } from "./llm";
+import { resolveOfficeMode } from "./office-mode";
+import { loadAgentsConfig } from "./providers";
 import { retrieve, writeDeliverable } from "./brain";
 import { skillsForAgent } from "./skills";
 import { parseCadence } from "./when";
@@ -27,15 +29,13 @@ import {
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
 import { buildCadModel } from "./cad";
 import { buildStudioProduction } from "./studio";
-import {
-  createEmail, emailSummary, listEmails, mauticConfigured, sendEmail,
-} from "./mautic";
 
 interface AgentRT { used: number; limit: number; breaker: BreakerState; }
 interface RuntimeState {
   bus: EventEmitter; tasks: Map<string, Task>; routines: Routine[]; connectors: Connector[];
   messages: AgentMessage[]; memory: MemoryEntry[]; agentRT: Map<string, AgentRT>;
   mode: RunMode; modeReason: string; started: boolean; clock?: NodeJS.Timeout;
+  provider: string; providerLabel: string; model: string;
 }
 
 const g = globalThis as unknown as { __orbit?: RuntimeState };
@@ -44,12 +44,15 @@ function state(): RuntimeState {
   if (!g.__orbit) {
     const bus = new EventEmitter();
     bus.setMaxListeners(200);
-    g.__orbit = { bus, tasks: new Map(), routines: [], connectors: [], messages: [], memory: [], agentRT: new Map(), mode: "demo", modeReason: "starting…", started: false };
+    g.__orbit = { bus, tasks: new Map(), routines: [], connectors: [], messages: [], memory: [], agentRT: new Map(), mode: "demo", modeReason: "starting…", started: false, provider: "", providerLabel: "", model: "" };
   }
   const o = g.__orbit;
   if (!o.messages) o.messages = [];
   if (!o.memory) o.memory = [];
   if (!o.agentRT) o.agentRT = new Map();
+  if (!o.provider) o.provider = "";
+  if (!o.providerLabel) o.providerLabel = "";
+  if (!o.model) o.model = "";
   return o;
 }
 
@@ -88,25 +91,37 @@ export function subscribe(fn: (e: OfficeEvent) => void): () => void {
 }
 function emit(e: OfficeEvent) { state().bus.emit("event", e); }
 
+async function applyOfficeMode(force = false) {
+  const s = state();
+  const resolved = await resolveOfficeMode(force);
+  s.mode = resolved.mode;
+  s.modeReason = resolved.reason;
+  s.provider = resolved.provider;
+  s.providerLabel = resolved.providerLabel;
+  s.model = resolved.model;
+  s.connectors = await getConnectors(resolved.mode === "live");
+}
+
 export async function ensureStarted() {
   const s = state();
   if (s.started) return;
   s.started = true;
   const cfg = loadConfig();
-  const status = await claudeStatus();
-  s.mode = status.available ? "live" : "demo";
-  s.modeReason = status.reason;
-  s.connectors = await getConnectors(status.available);
-  if (s.tasks.size === 0) seedDemo(cfg.model);
+  const agents = loadAgentsConfig();
+  await applyOfficeMode();
+  if (s.tasks.size === 0) seedDemo(agents.model || cfg.model);
   seedRoutines();
   startClock();
 }
 export async function getSnapshot(): Promise<OfficeSnapshot> {
   await ensureStarted();
+  await applyOfficeMode();
   const s = state();
-  const cfg = loadConfig();
+  const agents = loadAgentsConfig();
   return {
-    name: OFFICE_NAME, mode: s.mode, modeReason: s.modeReason, model: cfg.model,
+    name: OFFICE_NAME, mode: s.mode, modeReason: s.modeReason,
+    model: s.model || agents.model || "",
+    provider: s.provider, providerLabel: s.providerLabel,
     connectors: s.connectors,
     tasks: [...s.tasks.values()].sort((a, b) => b.createdAt - a.createdAt),
     routines: s.routines, agents: agentsSnapshot(), usage: { session: 18, week: 42 },
@@ -130,11 +145,7 @@ export function addMemory(agentId: string, text: string): MemoryEntry {
 export function getHive() { const s = state(); return { messages: s.messages, memory: s.memory }; }
 export function markRead(agentId: string) { const s = state(); for (const m of s.messages) if (m.to === agentId) m.read = true; }
 export async function refreshMode() {
-  const s = state();
-  const status = await claudeStatus(true);
-  s.mode = status.available ? "live" : "demo";
-  s.modeReason = status.reason;
-  s.connectors = await getConnectors(status.available);
+  await applyOfficeMode(true);
   emit({ type: "snapshot", snapshot: await getSnapshot() });
 }
 function heuristicAgent(dept: DeptId, title: string): string {
@@ -157,7 +168,13 @@ async function routeAgent(dept: DeptId, title: string): Promise<string> {
   if (s.mode === "live") {
     const roster = AGENTS_BY_DEPT[dept].map((a) => `${a.id}: ${a.name} — ${a.does}${a.lead ? " (department lead)" : ""}`).join("\n");
     const prompt = `You are ${JARVIS.name}, the ${JARVIS.role} of an AI office — every agent reports to you. Working through the ${dept} department lead, pick the single best agent id to own this task.\nTask: "${title}"\nAgents:\n${roster}\nReply with only the agent id.`;
-    const out = await claudePrompt(prompt, 30000);
+    const agents = loadAgentsConfig();
+    const out = await completePrompt({
+      provider: (s.provider || agents.provider) as typeof agents.provider,
+      model: s.model || agents.model,
+      prompt,
+      temperature: 0.2,
+    });
     if (out) {
       const id = out.trim().split(/\s|\n/)[0].replace(/[^a-z_]/gi, "");
       if (AGENTS_BY_DEPT[dept].some((a) => a.id === id)) return id;
@@ -177,7 +194,7 @@ export async function createTask(title: string, dept: DeptId, opts: { model?: st
   const task: Task = {
     id: shortId(), title, dept, agentId, agentName: agent.name,
     status: blocked ? "blocked" : "backlog", progress: 0, mode: s.mode,
-    model: opts.model || cfg.model, createdAt: Date.now(), updatedAt: Date.now(),
+    model: opts.model || loadAgentsConfig().model || cfg.model, createdAt: Date.now(), updatedAt: Date.now(),
     toolsUsed: [], scheduled: opts.scheduled, routineId: opts.routineId,
     outbound, needsApproval: outbound, deps, origin: opts.origin || "user",
   };
@@ -248,10 +265,7 @@ async function runTask(id: string) {
       const film = await studioForTask(task.title, task.agentId);
       if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
     }
-    if (agent.tools.includes("mautic") && allowed.includes("mautic")) {
-      const email = await emailForTask(task.title);
-      if (email) { deliverable += `\n\n---\n\n### Email (${mauticConfigured() ? "Mautic — live" : "Mautic — local"})\n${email}`; if (!usedTools.includes("mautic")) usedTools.unshift("mautic"); }
-    } else if (agent.tools.includes("trypost") && allowed.includes("trypost")) {
+    if (agent.tools.includes("trypost") && allowed.includes("trypost")) {
       const social = await socialForTask(task.title, agent.name);
       if (social) { deliverable += `\n\n---\n\n### Social (${trypostConfigured() ? "TryPost — live" : "TryPost — local"})\n${social}`; if (!usedTools.includes("trypost")) usedTools.unshift("trypost"); }
     }
@@ -427,31 +441,13 @@ async function studioForTask(title: string, agentId: string): Promise<string | n
     return null;
   }
 }
-async function emailForTask(title: string): Promise<string | null> {
-  const t = title.toLowerCase();
-  try {
-    const wantsSend = /\b(send|blast|deliver|broadcast)\b/.test(t);
-    const wantsCreate = /\b(draft|write|create|compose|build|new)\b/.test(t) && /\b(email|newsletter|campaign|blast|note)\b/.test(t);
-    if (wantsCreate) {
-      const email = await createEmail({ name: title.replace(/\s+/g, " ").trim().slice(0, 90) });
-      return `Created draft email **${email.name}** (${email.id}) — subject “${email.subject}”.`;
-    }
-    if (wantsSend) {
-      const emails = await listEmails({ limit: 100 });
-      const terms = t.split(/\W+/).filter((w) => w.length > 3);
-      const draft = emails.find((e) => e.status === "DRAFT" && terms.some((k) => e.name.toLowerCase().includes(k) || e.subject.toLowerCase().includes(k))) || emails.find((e) => e.status === "DRAFT");
-      if (draft) { const sent = await sendEmail(draft.id); if (sent) return `Sent **${sent.name}** to ${sent.segment || "its segment"} — ${sent.sentCount.toLocaleString()} recipients.`; }
-    }
-    const sum = await emailSummary();
-    return [`Email snapshot:`, `- Emails: ${sum.totalEmails} (${sum.sent} sent, ${sum.drafts} draft)`, `- Total sent: ${sum.totalSent.toLocaleString()} · Avg open rate: ${sum.avgOpenRate}%`, `- Campaigns: ${sum.campaigns} · Contacts: ${sum.contacts.toLocaleString()}`].join("\n");
-  } catch { return null; }
-}
 function extractParty(title: string): string | null {
   const m = title.match(/\b(?:for|from|to)\s+([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,3})/);
   return m ? m[1].replace(/\s+(worth|at|of|for|due).*$/i, "").trim() : null;
 }
 async function liveWork(task: Task, does: string, readTitles: string[]): Promise<string | null> {
   const cfg = loadConfig();
+  const agents = loadAgentsConfig();
   const s = state();
   const skills = skillsForAgent(task.agentId, task.dept);
   const notes = retrieve(task.title, 3).map((d) => `## ${d.title}\n${d.content.slice(0, 800)}`).join("\n\n");
@@ -463,11 +459,16 @@ async function liveWork(task: Task, does: string, readTitles: string[]): Promise
     allowedServers ? `Connectors you may use: ${allowedServers}.` : "",
     skillText ? `Follow these skills:\n${skillText}` : "",
     notes ? `Relevant notes from the Brain:\n${notes}` : "",
-    readTitles.length ? `You read: ${readTitles.join(", ")}.` : "",
+    readTitles.join(", ") ? `You read: ${readTitles.join(", ")}.` : "",
     `Task: ${task.title}`,
     `Produce the finished deliverable in Markdown. Be concise and specific.`,
   ].filter(Boolean).join("\n\n");
-  return claudePrompt(prompt, 120000);
+  return completePrompt({
+    provider: (s.provider || agents.provider) as typeof agents.provider,
+    model: s.model || agents.model || task.model,
+    prompt,
+    temperature: agents.temperature,
+  });
 }
 export function actOnTask(id: string, action: "approve" | "reject"): Task | null {
   const s = state();

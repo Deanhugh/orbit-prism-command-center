@@ -12,7 +12,6 @@ const PRIMARY = [
 const REST = [
   { href: "/marketing", label: "Marketing" },
   { href: "/studio", label: "Studio" },
-  { href: "/email", label: "Email" },
   { href: "/sales", label: "Sales" },
   { href: "/pmo", label: "PMO" },
   { href: "/cad", label: "CAD" },

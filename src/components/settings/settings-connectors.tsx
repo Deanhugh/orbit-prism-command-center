@@ -70,7 +70,7 @@ export function Connectors() {
           Department platforms
         </summary>
         <p className="mb-3 mt-1 text-[11px] text-ink-soft">
-          Twenty, Bigcapital, Plane, TryPost, and Mautic. Open only when you need to connect one — they each probe the network.
+          Twenty, Bigcapital, Plane, and TryPost. Open only when you need to connect one — they each probe the network.
         </p>
         <div className="space-y-3">
           <PlatformConnections />
