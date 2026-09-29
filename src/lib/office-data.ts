@@ -152,23 +152,43 @@ export function leadForDept(dept: DeptId): Agent | undefined {
   return AGENTS.find((a) => a.dept === dept && a.lead);
 }
 
+/** Apps every desk may run when Jarvis assigns the work. Ids / seats stay put. */
+const OFFICE_APPS = [
+  "crm",
+  "plane",
+  "bigcapital",
+  "trypost",
+  "studio",
+  "cad",
+  "notion",
+  "gmail",
+  "websearch",
+  "github",
+];
+
+for (const ag of AGENTS) {
+  ag.tools = [...new Set([...ag.tools, ...OFFICE_APPS])];
+}
+
+const ALL_DEPTS: DeptId[] = ["marketing", "emails", "delivery", "sales", "ops", "finance"];
+
 export const DEMO_CONNECTORS: Connector[] = [
-  c("Gmail", "gmail", "connected", ["emails", "sales", "delivery", "marketing", "finance"]),
-  c("Notion", "notion", "connected", ["marketing", "ops", "delivery", "sales", "emails"]),
-  c("CRM", "crm", "connected", ["sales"], "Twenty CRM — using local mock data"),
-  c("Bigcapital", "bigcapital", "connected", ["finance"], "Bigcapital — using local mock books"),
-  c("Plane", "plane", "connected", ["ops", "emails"], "Plane — using local mock projects"),
-  c("TryPost", "trypost", "connected", ["marketing"], "TryPost — using local mock posts"),
-  c("Studio", "studio", "connected", ["marketing"], "Orbit Studio — text-to-cut on /studio"),
-  c("CAD Studio", "cad", "connected", ["ops"], "Orbit CAD — text-to-part on /cad"),
-  c("GitHub", "github", "connected", ["ops"]),
+  c("Gmail", "gmail", "connected", ALL_DEPTS),
+  c("Notion", "notion", "connected", ALL_DEPTS),
+  c("CRM", "crm", "connected", ALL_DEPTS, "Twenty CRM — using local mock data"),
+  c("Bigcapital", "bigcapital", "connected", ALL_DEPTS, "Bigcapital — using local mock books"),
+  c("Plane", "plane", "connected", ALL_DEPTS, "Plane — using local mock projects"),
+  c("TryPost", "trypost", "connected", ALL_DEPTS, "TryPost — using local mock posts"),
+  c("Studio", "studio", "connected", ALL_DEPTS, "Orbit Studio — text-to-cut on /studio"),
+  c("CAD Studio", "cad", "connected", ALL_DEPTS, "Orbit CAD — text-to-part on /cad"),
+  c("GitHub", "github", "connected", ALL_DEPTS),
   c("Slack", "slack", "connected", ["emails", "ops"]),
   c("Canva", "canva", "connected", ["marketing", "delivery"]),
   c("Meta Ads", "meta", "connected", ["marketing"]),
   c("Stripe", "stripe", "connected", ["finance"]),
   c("Xero", "xero", "connected", ["finance"]),
   c("Apollo", "apollo", "connected", ["sales"]),
-  c("Web Search", "websearch", "connected", ["marketing", "ops"]),
+  c("Web Search", "websearch", "connected", ALL_DEPTS),
   c("Beehiiv", "beehiiv", "needs_auth", ["marketing"], "Sign in required"),
 ];
 

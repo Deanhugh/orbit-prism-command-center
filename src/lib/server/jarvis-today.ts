@@ -147,7 +147,32 @@ export function todayFallbackReply(userId: string, username: string, text: strin
     ];
     return bits.filter(Boolean).join(" ");
   }
-  return `I am here, ${owner}. Ask for the brief, who is waiting, or what is next on the calendar.`;
+  return `I am here, ${owner}. Ask for the brief, who is waiting, or tell me what to assign — CAD, Studio, CRM, PMO, Finance, or a post.`;
+}
+
+/** True when the owner is asking Jarvis to put a desk to work (not a brief / greeting). */
+export function looksLikeOfficeTask(text: string, kind?: string): boolean {
+  if (kind === "brief") return false;
+  const t = text.toLowerCase().trim();
+  if (!t) return false;
+  if (/^(hi|hello|hey|thanks|thank you|ok|okay|good (morning|afternoon|evening))[\s!.]*$/i.test(t)) {
+    return false;
+  }
+  const briefOnly =
+    /\b(who is waiting|what'?s on|on the board|morning brief|evening wrap|what time|today'?s calendar|habit)\b/.test(t);
+  const hasThenWork = /\b(and then|then |build|create|draft|make|assign)\b/.test(t);
+  if (briefOnly && !hasThenWork) return false;
+  if (
+    /\b(build|create|draft|make|design|film|shoot|cut|post|invoice|bill|reconcil|cad|studio|deal|lead|prospect|research|write|run|assign|schedule|onboard|chase|publish|model|open a|log a|raise|enrich|propose|video|reel|part|bracket)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (/\b(i need|please |can you |have the |get the |tell the |ask the |go and )\b/.test(t) && t.split(/\s+/).length >= 4) {
+    return true;
+  }
+  return false;
 }
 
 function nowHourWord() {
@@ -167,8 +192,8 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
 
   return [
     `You are ${JARVIS.name}, the ${JARVIS.role} of ${cfg.name}. ${JARVIS.does}`,
-    `You are speaking only in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
-    `You have conversation, briefing, and hybrid type/talk. Write in short spoken-friendly sentences.`,
+    `You are speaking in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
+    `You take typed and spoken instructions. When the owner asks for work, the office already dispatches it to the right desk — confirm the assignment in short spoken-friendly sentences.`,
     `You do not control the desktop, run Python, open apps, send system commands, or use Mark-LIV. If asked for those powers, say they are not on this panel.`,
     `Do not invent calendar items, people, or tasks that are not in the snapshot or this conversation.`,
     briefLine,
@@ -190,6 +215,12 @@ export function resolveTodayPrompt(preset: string, text: string): { text: string
 }
 
 export async function answerTodayChat(userId: string, username: string, text: string, kind: string): Promise<string> {
+  if (looksLikeOfficeTask(text, kind)) {
+    const { jarvisRoute } = await import("./runtime");
+    const routed = await jarvisRoute(text);
+    return routed.reply;
+  }
+
   const { loadAgentsConfig } = await import("./providers");
   const { chatStream, providerStatus } = await import("./llm");
   const cfg = loadAgentsConfig();

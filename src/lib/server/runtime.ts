@@ -248,29 +248,27 @@ async function runTask(id: string) {
     deliverable = demoDeliverable(task, agent.role);
   }
   const usedTools = allowed.slice(0, 2);
-  if (task.dept === "sales" && allowed.includes("crm")) {
+  if (allowed.includes("crm")) {
     const crm = await crmForTask(task.title);
     if (crm) { deliverable += `\n\n---\n\n### CRM (${twentyConfigured() ? "Twenty — live" : "Twenty — local"})\n${crm}`; if (!usedTools.includes("crm")) usedTools.unshift("crm"); }
   }
-  if (task.dept === "finance" && allowed.includes("bigcapital")) {
+  if (allowed.includes("bigcapital")) {
     const books = await financeForTask(task.title);
     if (books) { deliverable += `\n\n---\n\n### Books (${bigcapitalConfigured() ? "Bigcapital — live" : "Bigcapital — local"})\n${books}`; if (!usedTools.includes("bigcapital")) usedTools.unshift("bigcapital"); }
   }
-  if ((task.dept === "ops" || task.dept === "emails") && allowed.includes("plane")) {
+  if (allowed.includes("plane")) {
     const pm = await pmForTask(task.title, task.dept, agent.name);
     if (pm) { deliverable += `\n\n---\n\n### Projects (${planeConfigured() ? "Plane — live" : "Plane — local"})\n${pm}`; if (!usedTools.includes("plane")) usedTools.unshift("plane"); }
   }
-  if (task.dept === "marketing") {
-    if (agent.tools.includes("studio") && allowed.includes("studio")) {
-      const film = await studioForTask(task.title, task.agentId);
-      if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
-    }
-    if (agent.tools.includes("trypost") && allowed.includes("trypost")) {
-      const social = await socialForTask(task.title, agent.name);
-      if (social) { deliverable += `\n\n---\n\n### Social (${trypostConfigured() ? "TryPost — live" : "TryPost — local"})\n${social}`; if (!usedTools.includes("trypost")) usedTools.unshift("trypost"); }
-    }
+  if (allowed.includes("studio")) {
+    const film = await studioForTask(task.title, task.agentId);
+    if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
   }
-  if (task.dept === "ops" && agent.tools.includes("cad") && allowed.includes("cad")) {
+  if (allowed.includes("trypost")) {
+    const social = await socialForTask(task.title, agent.name);
+    if (social) { deliverable += `\n\n---\n\n### Social (${trypostConfigured() ? "TryPost — live" : "TryPost — local"})\n${social}`; if (!usedTools.includes("trypost")) usedTools.unshift("trypost"); }
+  }
+  if (allowed.includes("cad")) {
     const cad = await cadForTask(task.title, task.agentId);
     if (cad) { deliverable += `\n\n---\n\n### CAD\n${cad}`; if (!usedTools.includes("cad")) usedTools.unshift("cad"); }
   }
@@ -297,10 +295,13 @@ function parseAmount(text: string): number | undefined {
 const STAGE_ORDER: DealStage[] = ["NEW", "SCREENING", "MEETING", "PROPOSAL", "CUSTOMER"];
 async function crmForTask(title: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const wantsCreate = /\b(create|open|add|log|new|start)\b/.test(t) && /\b(deal|opportunity|opp|pipeline|lead)\b/.test(t);
+  const wantsWin = /\b(close|closed|won|win|signed|handoff|hand off|warm transfer)\b/.test(t);
+  const wantsAdvance = /\b(advance|move|progress|next stage|update)\b/.test(t) && /\b(deal|stage|pipeline)\b/.test(t);
+  if (!wantsCreate && !wantsWin && !wantsAdvance && !/\b(deal|crm|pipeline|lead|opportunit|twenty|prospect|sales)\b/.test(t)) {
+    return null;
+  }
   try {
-    const wantsCreate = /\b(create|open|add|log|new|start)\b/.test(t) && /\b(deal|opportunity|opp|pipeline|lead)\b/.test(t);
-    const wantsWin = /\b(close|closed|won|win|signed|handoff|hand off|warm transfer)\b/.test(t);
-    const wantsAdvance = /\b(advance|move|progress|next stage|update)\b/.test(t);
     if (wantsCreate) {
       const amount = parseAmount(title);
       const deal = await createDeal({ name: title.replace(/\s+/g, " ").trim().slice(0, 80), amount, stage: "NEW", closeDate: new Date(Date.now() + 30 * 864e5).toISOString() });
@@ -328,13 +329,16 @@ async function crmForTask(title: string): Promise<string | null> {
 function money(n: number): string { return `$${Math.round(n).toLocaleString()}`; }
 async function financeForTask(title: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const amount = parseAmount(title) || 0;
+  const isBill = /\b(bill|payable|vendor|supplier|contractor|expense)\b/.test(t);
+  const wantsCreate = /\b(raise|create|issue|new|draft|add|record|enter)\b/.test(t);
+  const wantsPay = /\b(pay|paid|payment|settle|remit)\b/.test(t);
+  const wantsReconcile = /\b(reconcile|reconciliation|match|bank)\b/.test(t);
+  const wantsChase = /\b(overdue|chase|remind|aging|outstanding|unpaid)\b/.test(t);
+  if (!wantsCreate && !wantsPay && !wantsReconcile && !wantsChase && !/\b(invoice|bill|payable|finance|books|cash|stripe|bigcapital)\b/.test(t)) {
+    return null;
+  }
   try {
-    const amount = parseAmount(title) || 0;
-    const isBill = /\b(bill|payable|vendor|supplier|contractor|expense)\b/.test(t);
-    const wantsCreate = /\b(raise|create|issue|new|draft|add|record|enter)\b/.test(t);
-    const wantsPay = /\b(pay|paid|payment|settle|remit)\b/.test(t);
-    const wantsReconcile = /\b(reconcile|reconciliation|match|bank)\b/.test(t);
-    const wantsChase = /\b(overdue|chase|remind|aging|outstanding|unpaid)\b/.test(t);
     if (wantsReconcile) {
       const pay = await reconcilePayment();
       if (pay) return `Reconciled payment **${pay.reference || pay.id}** — ${money(pay.amount)} ${pay.type} from/to ${pay.party}.`;
@@ -369,10 +373,13 @@ async function financeForTask(title: string): Promise<string | null> {
 }
 async function pmForTask(title: string, dept: DeptId, agentName: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const wantsCreate = /\b(create|add|open|plan|new|log|file|raise)\b/.test(t) && /\b(task|ticket|issue|work item|work-item|story|project|backlog)\b/.test(t);
+  const wantsDone = /\b(done|complete|completed|finish|finished|ship|shipped|close|closed)\b/.test(t) && /\b(ticket|task|issue|work item|project|plane)\b/.test(t);
+  const wantsStart = /\b(start|begin|pick up|in progress|working on|wip)\b/.test(t) && /\b(ticket|task|issue|work item|project|plane)\b/.test(t);
+  if (!wantsCreate && !wantsDone && !wantsStart && !/\b(plane|project|ticket|sprint|backlog|milestone|pmo|work item)\b/.test(t)) {
+    return null;
+  }
   try {
-    const wantsCreate = /\b(create|add|open|plan|new|log|file|raise)\b/.test(t) && /\b(task|ticket|issue|work item|work-item|story|project|backlog)\b/.test(t);
-    const wantsDone = /\b(done|complete|completed|finish|finished|ship|shipped|close|closed)\b/.test(t);
-    const wantsStart = /\b(start|begin|pick up|in progress|working on|wip)\b/.test(t);
     if (wantsCreate) {
       const stateGroup: StateGroup = dept === "emails" ? "backlog" : "unstarted";
       const item = await createWorkItem({ name: title.replace(/\s+/g, " ").trim().slice(0, 90), priority: /\burgent|asap|critical\b/.test(t) ? "urgent" : /\bhigh\b/.test(t) ? "high" : "medium", stateGroup, assignee: agentName });
@@ -396,20 +403,23 @@ async function pmForTask(title: string, dept: DeptId, agentName: string): Promis
 }
 async function socialForTask(title: string, agentName: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const platforms: string[] = [];
+  for (const [re, name] of [[/\b(x|twitter|tweet)\b/, "X"], [/\blinkedin\b/, "LinkedIn"], [/\binstagram|insta|ig\b/, "Instagram"], [/\bbluesky|bsky\b/, "Bluesky"], [/\bthreads\b/, "Threads"], [/\bfacebook|fb\b/, "Facebook"]] as [RegExp, string][]) {
+    if (re.test(t)) platforms.push(name);
+  }
+  const socialHint = platforms.length > 0 || /\b(post|social|trypost|content calendar|carousel|reel caption)\b/.test(t);
+  if (!socialHint) return null;
   try {
     const wantsPublish = /\b(publish|post now|go live|send it)\b/.test(t);
     const wantsSchedule = /\b(schedule|queue|line up|book)\b/.test(t);
     const wantsCreate = /\b(draft|write|create|compose|post|tweet|announce|share)\b/.test(t);
-    const platforms: string[] = [];
-    for (const [re, name] of [[/\b(x|twitter|tweet)\b/, "X"], [/\blinkedin\b/, "LinkedIn"], [/\binstagram|insta|ig\b/, "Instagram"], [/\bbluesky|bsky\b/, "Bluesky"], [/\bthreads\b/, "Threads"], [/\bfacebook|fb\b/, "Facebook"]] as [RegExp, string][]) {
-      if (re.test(t)) platforms.push(name);
-    }
     if (wantsCreate || wantsPublish || wantsSchedule) {
       const status = wantsPublish ? "PUBLISHED" : wantsSchedule ? "SCHEDULED" : "DRAFT";
       const post = await createPost({ content: title.replace(/\s+/g, " ").trim(), platforms: platforms.length ? platforms : undefined, status, scheduledAt: status === "SCHEDULED" ? new Date(Date.now() + 864e5).toISOString() : null, author: agentName });
       const where = post.platforms.join(", ");
       return `Created **${post.status.toLowerCase()}** post (${post.id})${where ? ` for ${where}` : ""}: “${post.content.slice(0, 80)}”.`;
     }
+    if (!/\b(post|social|linkedin|instagram|tweet|trypost|content calendar)\b/.test(t)) return null;
     const sum = await socialSummary();
     const lines = sum.byState.filter((s) => s.count > 0).map((s) => `- ${s.label}: ${s.count}`);
     return [`Content calendar (${sum.activeChannels}/${sum.channels} channels active, ${sum.totalPosts} posts):`, ...lines, `- **Scheduled next 7 days:** ${sum.scheduledNext7}`].join("\n");
@@ -480,7 +490,13 @@ export function actOnTask(id: string, action: "approve" | "reject"): Task | null
 }
 function pickDept(text: string): DeptId {
   const t = text.toLowerCase();
-  if (/\b(cad|hilbert|bracket|enclosure|flange|step file|3d model)\b/.test(t)) return "ops";
+  if (/\b(cad|hilbert|bracket|enclosure|flange|step file|3d model|mechanical part|housing|shaft)\b/.test(t)) return "ops";
+  if (/\b(video|film|reel|trailer|studio|cinematic|explainer|talking.?head|montage)\b/.test(t)) return "marketing";
+  if (/\b(invoice|bill|payable|reconcil|finance|books|overdue|stripe)\b/.test(t)) return "finance";
+  if (/\b(deal|lead|prospect|pipeline|crm|proposal|outbound|inbound)\b/.test(t)) return "sales";
+  if (/\b(ticket|sprint|backlog|milestone|plane|pmo|work item|project plan)\b/.test(t)) return "emails";
+  if (/\b(account|retention|onboard|renewal|client health)\b/.test(t)) return "delivery";
+  if (/\b(post|social|seo|brand|content|campaign|trypost)\b/.test(t)) return "marketing";
   let best: DeptId = "ops"; let bestScore = -1;
   for (const d of DEPARTMENTS) {
     const hay = (d.name + " " + AGENTS_BY_DEPT[d.id].map((a) => a.role + " " + a.does).join(" ")).toLowerCase();

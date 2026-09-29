@@ -7,29 +7,6 @@ import { bigcapitalConfigured } from "./bigcapital";
 import { planeConfigured } from "./plane";
 import { trypostConfigured } from "./trypost";
 
-// Default department wiring for known brands (anything unknown feeds every pod).
-const DEFAULT_WIRING: Record<string, DeptId[]> = {
-  gmail: ["emails", "sales", "delivery"],
-  googledrive: ["delivery", "ops"],
-  notion: ["marketing", "ops", "delivery", "sales"],
-  slack: ["emails", "ops"],
-  canva: ["marketing", "delivery"],
-  meta: ["marketing"],
-  stripe: ["finance"],
-  xero: ["finance"],
-  apollo: ["sales"],
-  clearbit: ["sales"],
-  beehiiv: ["marketing"],
-  websearch: ["marketing", "ops"],
-  crm: ["sales"],
-  bigcapital: ["finance"],
-  plane: ["ops", "emails"],
-  trypost: ["marketing"],
-  studio: ["marketing"],
-  github: ["ops"],
-  cad: ["ops"],
-};
-
 const ALL_DEPTS: DeptId[] = [
   "marketing",
   "emails",
@@ -38,6 +15,29 @@ const ALL_DEPTS: DeptId[] = [
   "ops",
   "finance",
 ];
+
+// Default department wiring for known brands (anything unknown feeds every pod).
+const DEFAULT_WIRING: Record<string, DeptId[]> = {
+  gmail: ALL_DEPTS,
+  googledrive: ["delivery", "ops"],
+  notion: ALL_DEPTS,
+  slack: ["emails", "ops"],
+  canva: ["marketing", "delivery"],
+  meta: ["marketing"],
+  stripe: ["finance"],
+  xero: ["finance"],
+  apollo: ["sales"],
+  clearbit: ["sales"],
+  beehiiv: ["marketing"],
+  websearch: ALL_DEPTS,
+  crm: ALL_DEPTS,
+  bigcapital: ALL_DEPTS,
+  plane: ALL_DEPTS,
+  trypost: ALL_DEPTS,
+  studio: ALL_DEPTS,
+  github: ALL_DEPTS,
+  cad: ALL_DEPTS,
+};
 
 function normKey(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");

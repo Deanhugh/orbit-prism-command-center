@@ -152,8 +152,8 @@ export function TodayJarvis({
         <div className="mt-4 min-h-[72px] max-h-[120px] flex-1 space-y-2 overflow-y-auto border-t border-line/70 pt-3 thin-scroll pr-1">
           {messages.length === 0 ? (
             <p className="text-[12px] text-ink-soft">
-              Talk to Jarvis in this box — type, or hold the mic. Ask for the brief, who is waiting, or
-              what is next.
+              Talk or type. Briefs stay in this box. Work — CAD, Studio, CRM, PMO, Finance, a post —
+              gets assigned to a desk.
             </p>
           ) : (
             messages.slice(-6).map((line) => (
@@ -208,7 +208,7 @@ export function TodayJarvis({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Tell Jarvis…"
+            placeholder="Tell Jarvis what to do…"
             className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] outline-none placeholder:text-ink-soft/60"
           />
           <button
@@ -226,19 +226,19 @@ export function TodayJarvis({
           {voiceSupported ? (
             <button
               type="button"
-              onMouseDown={start}
-              onMouseUp={stop}
-              onTouchStart={start}
-              onTouchEnd={stop}
+              onClick={() => (listening ? stop() : start())}
               className={cn(
                 "grid h-9 w-9 shrink-0 place-items-center rounded-full",
                 listening ? "bg-finance text-white" : "text-ink-soft hover:text-ink",
               )}
-              title="Hold to talk"
+              title={listening ? "Stop listening" : "Talk to Jarvis"}
+              aria-pressed={listening}
             >
               <Mic size={15} />
             </button>
-          ) : null}
+          ) : (
+            <p className="text-[10px] text-ink-soft">Voice needs Chrome, Edge, or Safari.</p>
+          )}
           <button
             type="submit"
             disabled={busy || !input.trim()}
