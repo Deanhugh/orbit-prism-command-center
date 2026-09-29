@@ -99,7 +99,9 @@ export function Connectors() {
 
   const notion = data?.connectors.find((c) => c.key === "notion");
   const apify = data?.connectors.find((c) => c.key === "apify");
+  const krea = data?.connectors.find((c) => c.key === "krea" || c.key === "kreaai");
   const apifyUrl = MCP_CATALOG.find((i) => i.id === "apify")?.command || "https://mcp.apify.com";
+  const kreaUrl = MCP_CATALOG.find((i) => i.id === "krea")?.command || "https://api.krea.ai/mcp";
 
   return (
     <div className="space-y-3">
@@ -118,11 +120,16 @@ export function Connectors() {
         url={apifyUrl}
         onSaved={load}
       />
+      <KreaPanel
+        row={krea}
+        url={kreaUrl}
+        onSaved={load}
+      />
 
       <section id="browse-mcp" className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Browse MCP</h2>
         <p className="mb-3 text-[11px] text-ink-soft">
-          Remote apps (Notion, Apify, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
+          Remote apps (Notion, Apify, Krea, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
         </p>
         <McpBrowse
           catalog={data?.catalog || []}
@@ -208,6 +215,28 @@ function ApifyPanel({ row, url, onSaved }: { row?: ConnRow; url: string; onSaved
         . Actor runs use your Apify credits.
       </p>
       <AuthActions name="Apify" url={url} auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} placeholder="APIFY_TOKEN from Apify Console" />
+    </section>
+  );
+}
+
+function KreaPanel({ row, url, onSaved }: { row?: ConnRow; url: string; onSaved: () => void }) {
+  const live = row?.status === "connected";
+  return (
+    <section className="rounded-lg border border-line bg-panel p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : "bg-finance")} />
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Krea — live remote MCP</h2>
+        <span className="text-[10px] text-ink-soft">{row?.reason || "Not connected yet"}</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+        Agents generate images and video through Krea (Krea 2, Flux, Veo, Kling, upscale). Same connection type as Notion:
+        Streamable HTTP at <code className="text-ink">https://api.krea.ai/mcp</code> + OAuth or a token. The page at{" "}
+        <a className="underline" href="https://www.krea.ai/mcp" target="_blank" rel="noreferrer">www.krea.ai/mcp</a>
+        {" "}is the setup guide. Create a token at{" "}
+        <a className="underline" href="https://www.krea.ai/app/api/tokens" target="_blank" rel="noreferrer">krea.ai/app/api/tokens</a>
+        {" "}or Connect with Krea. Jobs bill your Krea workspace.
+      </p>
+      <AuthActions name="Krea" url={url} auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} placeholder="KREA_API_TOKEN from krea.ai/app/api/tokens" />
     </section>
   );
 }

@@ -130,7 +130,7 @@ On Railway, catalog apps are live only when they are **remote HTTP/SSE** servers
 4. Click **Test**. Green means agents can search the workspace on live tasks.
 5. Share Notion pages with the integration if search returns nothing.
 
-The same card (URL + OAuth or token + Test) is how GitHub, Stripe, Apify, and any custom remote MCP connect. OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens sit in `/app/data/secrets.json` on the volume.
+The same card (URL + OAuth or token + Test) is how GitHub, Stripe, Apify, Krea, and any custom remote MCP connect. OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens sit in `/app/data/secrets.json` on the volume.
 
 Optional env: `NOTION_TOKEN` or `NOTION_API_KEY` (same as pasting the token in Settings).
 
@@ -143,6 +143,16 @@ Remote Streamable HTTP MCP at `https://mcp.apify.com` — not the Apify CLI, not
 3. Click **Test**. Agents then run scrapers (web fetch, Instagram, Google search) only on live tasks that mention a URL, scrape, or a social network — not on every office task.
 
 Runs bill your Apify account (capped per run). Optional env: `APIFY_TOKEN` (same Bearer header as Settings). Rental and full-permission Actors stay excluded.
+
+### Krea (images + video)
+
+Remote Streamable HTTP MCP at `https://api.krea.ai/mcp` — the page at [www.krea.ai/mcp](https://www.krea.ai/mcp) is the setup guide. After deploy:
+
+1. Open **Settings → MCP** → **Krea — live remote MCP**.
+2. **Connect with OAuth** (picks the Krea workspace to bill), *or* paste `KREA_API_TOKEN` from [krea.ai/app/api/tokens](https://www.krea.ai/app/api/tokens) and **Save token**.
+3. Click **Test**. Agents then generate images/video (Krea 2, list models, poll jobs) only on live tasks that mention Krea or ask to generate an image/video — not on every office task.
+
+OAuth bills compute units on the workspace you pick at consent. API tokens bill the workspace API balance. Optional env: `KREA_API_TOKEN`.
 
 ## Department platforms on Railway
 

@@ -76,6 +76,8 @@ const COLOR: Record<string, string> = {
   plane: "#3f76ff",
   trypost: "#e8562e",
   apify: "#96d000",
+  krea: "#111111",
+  kreaai: "#111111",
   mautic: "#4e5e9e",
 };
 

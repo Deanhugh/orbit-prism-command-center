@@ -38,6 +38,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   studio: ALL_DEPTS,
   github: ALL_DEPTS,
   apify: ALL_DEPTS,
+  krea: ALL_DEPTS,
   cad: ALL_DEPTS,
 };
 

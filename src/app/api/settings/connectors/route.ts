@@ -11,6 +11,7 @@ import {
 import { MCP_CATALOG, catalogItemByName, parseMcpCommand } from "@/lib/mcp-catalog";
 import { mcpAccessToken, setMcpTokens, clearMcpTokens, mcpKey } from "@/lib/server/mcp-auth";
 import { probeRemoteConnector, isRemoteTransport } from "@/lib/server/mcp-remote";
+import { normalizeKreaUrl } from "@/lib/server/mcp-krea";
 import { refreshMode } from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
@@ -35,7 +36,7 @@ async function payload() {
       ? status.reason
       : connectors.some((c) => c.kind === "remote" && c.status === "connected")
         ? "Remote MCP live on this host"
-        : "Add a remote MCP (Notion or Apify) with OAuth or a token — npx commands are not live on Railway.",
+        : "Add a remote MCP (Notion, Apify, or Krea) with OAuth or a token — npx commands are not live on Railway.",
     claude: status,
     connectors,
     deny: cfg.mcp.deny,
@@ -102,6 +103,9 @@ export async function POST(req: NextRequest) {
     args = parsed.args;
   }
   if (!target) return NextResponse.json({ error: "command/URL is required" }, { status: 400 });
+  if (norm(name) === "krea" || norm(name) === "kreaai" || /krea\.ai/i.test(target)) {
+    target = normalizeKreaUrl(target);
+  }
 
   const auth = (body.auth as string) || catalog?.auth || (isRemoteTransport(transport) ? "oauth" : "none");
   const depts = Array.isArray(body.depts) ? body.depts.map(String) : undefined;

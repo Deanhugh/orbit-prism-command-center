@@ -3,6 +3,7 @@ import { catalogItemByName } from "@/lib/mcp-catalog";
 import { addCustomConnector, loadCustomConnectors } from "@/lib/server/config";
 import { mcpKey } from "@/lib/server/mcp-auth";
 import { startMcpOAuth } from "@/lib/server/mcp-oauth";
+import { normalizeKreaUrl } from "@/lib/server/mcp-krea";
 import { requestOrigin, redirectTo } from "@/lib/server/auth-http";
 
 export const runtime = "nodejs";
@@ -19,7 +20,10 @@ export async function GET(req: NextRequest) {
     (c) => c.name.toLowerCase() === name.toLowerCase() || mcpKey(c.name) === mcpKey(name),
   );
   const transport = existing?.transport || catalog?.transport || "http";
-  const target = existing?.target || catalog?.command || "";
+  let target = existing?.target || catalog?.command || "";
+  if (mcpKey(name) === "krea" || mcpKey(name) === "kreaai" || /krea\.ai/i.test(target)) {
+    target = normalizeKreaUrl(target);
+  }
   if (transport === "stdio" || !/^https?:\/\//i.test(target)) {
     return NextResponse.json(
       { error: "OAuth is for remote HTTP/SSE MCP URLs. Enable Notion from the catalog first." },

@@ -86,10 +86,10 @@ export const DEPT_MAP: Record<DeptId, Department> = Object.fromEntries(
 export const AGENTS: Agent[] = [
   a("mk_research", "marketing", false, "RESEARCH", "Research Agent", "Scans the market, audience and competitors every day and files what changed — the insight the rest of marketing runs on. Reports to the Chief of Staff.", ["websearch", "notion", "apify"]),
   a("mk_ads", "marketing", false, "AEO / SEO", "AEO & SEO Agent", "Owns search and answer-engine visibility — keywords, technical SEO, and content that ranks and gets cited. Reports to the Chief of Staff.", ["websearch", "notion", "apify"]),
-  a("mk_gfx", "marketing", false, "BRAND", "Brand Agent", "Guards the brand — voice, look, and one consistent identity across every asset. Reports to the Chief of Staff.", ["trypost", "canva", "notion", "studio"]),
-  a("mk_lead", "marketing", false, "CONTENT STRATEGIST", "Content Strategist", "Owns the content calendar and strategy — turns positioning into a pipeline of content that performs. Reports to the Chief of Staff.", ["trypost", "notion", "canva", "studio"]),
+  a("mk_gfx", "marketing", false, "BRAND", "Brand Agent", "Guards the brand — voice, look, and one consistent identity across every asset. Reports to the Chief of Staff.", ["trypost", "canva", "notion", "studio", "krea"]),
+  a("mk_lead", "marketing", false, "CONTENT STRATEGIST", "Content Strategist", "Owns the content calendar and strategy — turns positioning into a pipeline of content that performs. Reports to the Chief of Staff.", ["trypost", "notion", "canva", "studio", "krea"]),
   a("mk_news", "marketing", false, "EMAIL MARKETING", "Email Marketing Agent", "Runs lifecycle and newsletter email — campaigns, sequences, and the note subscribers actually open. Reports to the Chief of Staff.", ["trypost", "gmail"]),
-  a("mk_social", "marketing", false, "SOCIAL MEDIA", "Social Media Strategist", "Runs the social engine across channels — hooks, reels, carousels, and the posting calendar. Reports to the Chief of Staff.", ["trypost", "canva", "notion", "studio", "apify"]),
+  a("mk_social", "marketing", false, "SOCIAL MEDIA", "Social Media Strategist", "Runs the social engine across channels — hooks, reels, carousels, and the posting calendar. Reports to the Chief of Staff.", ["trypost", "canva", "notion", "studio", "apify", "krea"]),
   a("em_lead", "emails", true, "PROGRAM MANAGER", "Program Manager", "Owns every project portfolio and leads all the project managers — sets priorities, staffing, and timelines, and reports portfolio status to the Chief of Staff.", ["plane", "notion", "gmail"]),
   a("em_client", "emails", false, "PROJECT MANAGER", "Project Manager", "Owns a portfolio of client projects end to end — scope, plan, milestones, and on-time delivery.", ["plane", "notion", "gmail"]),
   a("em_internal", "emails", false, "PROJECT MANAGER", "Project Manager", "Drives day-to-day delivery across a portfolio of projects — status, sign-offs, and hours; moves things before they slip.", ["plane", "notion", "gmail"]),
@@ -165,6 +165,7 @@ const OFFICE_APPS = [
   "websearch",
   "github",
   "apify",
+  "krea",
 ];
 
 for (const ag of AGENTS) {

@@ -11,6 +11,7 @@ import {
 } from "./mcp-client";
 import { isNotionMcpUrl, looksLikeNotionToken, notionRestProbe, notionRestSearch } from "./notion-rest";
 import { isApifyConnector, looksLikeScrapeQuery, runApifyForQuery } from "./mcp-apify";
+import { isKreaConnector, looksLikeKreaQuery, normalizeKreaUrl, runKreaForQuery } from "./mcp-krea";
 
 const probeCache = new Map<string, { at: number; value: McpProbe }>();
 
@@ -39,7 +40,7 @@ export async function probeRemoteConnector(conn: CustomConnector, force = false)
     return value;
   }
 
-  const mcp = await openMcpSession({ key, url: conn.target, token });
+  const mcp = await openMcpSession({ key, url: isKreaConnector(conn) ? normalizeKreaUrl(conn.target) : conn.target, token });
   if (mcp.ok) {
     probeCache.set(cacheKey, { at: Date.now(), value: mcp });
     return mcp;
@@ -83,6 +84,14 @@ export async function searchRemoteConnector(conn: CustomConnector, query: string
     }
   }
 
+  if (isKreaConnector(conn) && probe.session) {
+    try {
+      return await runKreaForQuery(probe.session, query);
+    } catch (err) {
+      return err instanceof Error ? err.message : "Krea request failed";
+    }
+  }
+
   if (probe.session) {
     const tools = pickSearchTools(probe.session.tools.length ? probe.session.tools : probe.tools);
     const tool = tools[0];
@@ -108,6 +117,7 @@ export async function mcpContextForQuery(query: string): Promise<{ key: string; 
   const out: { key: string; name: string; text: string }[] = [];
   for (const conn of remoteConnectors()) {
     if (isApifyConnector(conn) && !looksLikeScrapeQuery(q) && !/\bapify\b/i.test(q)) continue;
+    if (isKreaConnector(conn) && !looksLikeKreaQuery(q)) continue;
     const text = await searchRemoteConnector(conn, q);
     if (text) out.push({ key: mcpKey(conn.name), name: conn.name, text: text.slice(0, 2500) });
   }
