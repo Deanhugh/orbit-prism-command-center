@@ -99,11 +99,18 @@ function hashPrompt(prompt: string): number {
 }
 
 function topicFromPrompt(prompt: string): string {
-  const cleaned = prompt
+  let cleaned = prompt
     .replace(/^(make|create|produce|build|shoot|film|cut|edit)\s+(me\s+)?(a|an|the)\s+/i, "")
-    .replace(/\b(video|film|reel|trailer|spot|explainer|documentary|short|montage|commercial)\b/gi, "")
+    .replace(/\b\d+[-\s]?(second|sec|s)\b/gi, "")
+    .replace(/\b(video|film|reel|trailer|spot|explainer|documentary|short|shorts|montage|commercial|cinematic|vertical|teaser|product)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
+  for (let i = 0; i < 3; i++) {
+    const next = cleaned.replace(/^(about|for|on|of|a|an|the)\s+/i, "").trim();
+    if (next === cleaned) break;
+    cleaned = next;
+  }
+  cleaned = cleaned.replace(/^[:\-–—,.\s]+|[:\-–—,.\s]+$/g, "").trim();
   return cleaned.slice(0, 72) || "Orbit Prism";
 }
 
