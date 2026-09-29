@@ -141,16 +141,19 @@ Sign into Twenty, then open `/sales`. The board is **live** (not mock) when thos
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
-### Studio — `/studio` (text to cut)
+### Studio — `/studio` (working)
 
-Orbit-native video production desk. Left: prompt + Brand / Content / Social agent log. Right: a playable slate and timeline. This is **not** a vendored [OpenMontage](https://github.com/calesthio/OpenMontage) install (AGPLv3 Python + Remotion + FFmpeg, agent-driven, no HTTP API). Agents emit a named shot list the browser can play.
+Studio is a working page inside Command Center. Sign in, then open:
 
-- Page: https://command-center-production-e72e.up.railway.app/studio
+https://command-center-production-e72e.up.railway.app/studio
+
+Prompt a film yourself, or pick **Product film / Explainer / Trailer / Reel**. Brand, Content, and Social agents write the cut on the left; the right side plays the shot list. Play, pause, and the timeline work. Productions persist in `data/studio-productions.json` on the host volume.
+
 - Agents: Brand (`mk_gfx`), Content Strategist (`mk_lead`), Social Media (`mk_social`) have the `studio` tool (`studio_produce`, `studio_list`, `studio_get`)
 - Named cuts: product film, explainer, trailer, vertical reel, talking-head, documentary. Other prompts get a five-shot branded spot.
-- Productions persist in `data/studio-productions.json` on the host volume.
+- Marketing tasks that mention video / reel / trailer / explainer write a cut and link `/studio`
 
-Prompt on the page yourself, or assign a Marketing task that mentions video / reel / trailer / explainer — the run loop writes the cut and links `/studio`.
+This is **not** OpenMontage and it does **not** render a finished MP4. There is no Veo, Kling, Remotion, or FFmpeg export. It is the office cut — a playable storyboard — the same way CAD is a text-to-part viewport, not SolidWorks. A real rendered video still needs a separate [OpenMontage](https://github.com/calesthio/OpenMontage) checkout or a video-model key later.
 
 ### TryPost — `/marketing` (blocked on image)
 
