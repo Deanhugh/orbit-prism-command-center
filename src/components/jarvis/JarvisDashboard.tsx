@@ -26,6 +26,7 @@ import { TodayJarvis } from "./TodayJarvis";
 import { BriefBody } from "./BriefBody";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import type { StoredBrief } from "@/lib/types";
+import { primeJarvisSpeech, speakJarvis, spokenBrief } from "@/lib/speak-jarvis";
 
 type TaskTab = "today" | "overdue" | "upcoming" | "all";
 
@@ -81,6 +82,17 @@ export function JarvisDashboard({
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
   const briefs = officeBriefs.length ? officeBriefs : fetchedBriefs;
   const shownBrief = briefs.find((b) => b.kind === briefTab) || null;
+
+  function openBrief(kind: "morning" | "evening") {
+    setBriefTab(kind);
+    primeJarvisSpeech();
+    const brief = briefs.find((b) => b.kind === kind);
+    const fallback =
+      kind === "morning"
+        ? `Good morning, ${owner}. ${jarvisLine}`
+        : `Good evening, ${owner}. ${jarvisLine}`;
+    speakJarvis(brief ? spokenBrief(brief) : fallback);
+  }
 
   async function toggleHabit(id: string) {
     if (!hub) return;
@@ -188,7 +200,7 @@ export function JarvisDashboard({
           <div className="flex gap-1">
             <button
               type="button"
-              onClick={() => setBriefTab("morning")}
+              onClick={() => openBrief("morning")}
               className={cn(
                 "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase",
                 briefTab === "morning" ? "bg-ink text-canvas" : "text-ink-soft",
@@ -198,7 +210,7 @@ export function JarvisDashboard({
             </button>
             <button
               type="button"
-              onClick={() => setBriefTab("evening")}
+              onClick={() => openBrief("evening")}
               className={cn(
                 "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase",
                 briefTab === "evening" ? "bg-ink text-canvas" : "text-ink-soft",

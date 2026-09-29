@@ -8,6 +8,7 @@ import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
 import type { BriefKind, StoredBrief } from "@/lib/types";
 import { BriefBody } from "../BriefBody";
+import { primeJarvisSpeech, speakJarvis, spokenBrief } from "@/lib/speak-jarvis";
 
 const TABS = ["Morning", "Evening", "History"] as const;
 
@@ -38,6 +39,7 @@ export function BriefingApp({ username }: { username: string }) {
   async function runNow() {
     if (tab === "History") return;
     setRunning(true);
+    primeJarvisSpeech();
     try {
       const res = await fetch("/api/briefs", {
         method: "POST",
@@ -46,6 +48,8 @@ export function BriefingApp({ username }: { username: string }) {
       });
       const d = await res.json();
       if (d.briefs) setStored(d.briefs);
+      const written = (d.briefs as StoredBrief[] | undefined)?.find((b) => b.kind === kind);
+      if (written) speakJarvis(spokenBrief(written));
     } finally {
       setRunning(false);
     }
@@ -59,7 +63,18 @@ export function BriefingApp({ username }: { username: string }) {
             <button
               key={t}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => {
+                setTab(t);
+                if (t === "History") return;
+                const kind: BriefKind = t === "Evening" ? "evening" : "morning";
+                const brief = briefs.find((b) => b.kind === kind);
+                primeJarvisSpeech();
+                speakJarvis(
+                  brief
+                    ? spokenBrief(brief)
+                    : `No ${kind === "evening" ? "evening wrap" : "morning brief"} stored yet.`,
+                );
+              }}
               className={cn(
                 "text-[12px] font-semibold uppercase tracking-[0.14em]",
                 tab === t ? "text-ink" : "text-ink-soft hover:text-ink",
