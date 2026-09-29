@@ -18,6 +18,7 @@ export function HeaderControls({
 }) {
   const mode = useOffice((s) => s.mode);
   const modeReason = useOffice((s) => s.modeReason);
+  const providerLabel = useOffice((s) => s.providerLabel);
   const refreshMode = useOffice((s) => s.refreshMode);
   const [clock, setClock] = useState("--:--:--");
 
@@ -44,7 +45,7 @@ export function HeaderControls({
         )}
       >
         <span className={cn("h-1.5 w-1.5 rounded-full", mode === "live" ? "bg-emails" : "bg-finance")} />
-        {mode === "live" ? "Live · Claude" : "Demo"}
+        {mode === "live" ? `Live · ${providerLabel || "model"}` : "Offline"}
       </button>
       <span className={cn("serif tabular-nums text-[13px] font-semibold", dark ? "text-white" : "text-ink")}>
         {clock}

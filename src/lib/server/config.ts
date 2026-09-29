@@ -81,25 +81,47 @@ export interface BrainLocation {
   vaultResolved: boolean;
 }
 
+function seedBrainIfEmpty(dest: string, sample: string) {
+  try {
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    const hasNotes = fs.readdirSync(dest).some((f) => f.toLowerCase().endsWith(".md"));
+    if (hasNotes || !fs.existsSync(sample)) return;
+    for (const name of fs.readdirSync(sample)) {
+      const src = path.join(sample, name);
+      const out = path.join(dest, name);
+      if (!fs.statSync(src).isFile()) continue;
+      if (!fs.existsSync(out)) fs.copyFileSync(src, out);
+    }
+  } catch {
+    /* volume may be read-only in some hosts */
+  }
+}
+
 export function brainLocation(): BrainLocation {
   const cfg = loadConfig();
   const sample = path.join(process.cwd(), "brain");
 
-  // 1. Prefer the Obsidian vault ID when it resolves on this machine.
+  // 1. Prefer the Obsidian vault ID when it resolves on this machine (Mac).
   if (cfg.vaultId) {
     const resolved = resolveVaultPath(cfg.vaultId);
     if (resolved) return { dir: resolved, source: "vault", vaultResolved: true };
   }
 
-  // 2. Otherwise use the configured brain path if it exists on this machine.
+  // 2. ORBIT_BRAIN / configured path. On Railway this is the volume at /app/data/brain.
   const configured = path.isAbsolute(cfg.brain)
     ? cfg.brain
     : path.join(process.cwd(), cfg.brain);
+  if (process.env.ORBIT_BRAIN) {
+    seedBrainIfEmpty(configured, sample);
+    if (fs.existsSync(configured)) {
+      return { dir: configured, source: "path", vaultResolved: false };
+    }
+  }
   if (fs.existsSync(configured)) {
     return { dir: configured, source: "path", vaultResolved: false };
   }
 
-  // 3. Fall back to the bundled sample brain (e.g. on a cloud host).
+  // 3. Bundled sample brain (last resort).
   return { dir: sample, source: "path", vaultResolved: false };
 }
 
@@ -145,6 +167,8 @@ export interface CustomConnector {
   args?: string[];
   depts?: string[];
   addedAt: number;
+  /** How Command Center authenticates a remote MCP. stdio stays CLI-only. */
+  auth?: "none" | "bearer" | "oauth";
 }
 
 function customConnectorsFile(): string {

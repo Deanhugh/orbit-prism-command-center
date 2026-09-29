@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type {
-  AgentMessage, AgentRuntimeInfo, BreakerState, Connector, DeptId,
-  MemoryEntry, OfficeEvent, OfficeSnapshot, Routine, RunMode, Task,
+  AgentMessage, AgentRuntimeInfo, BreakerState, BriefKind, Connector, DeptId,
+  MemoryEntry, OfficeEvent, OfficeSnapshot, Routine, RoutineKind, RunMode, Task,
 } from "../types";
 import {
   AGENTS, AGENTS_BY_DEPT, DEPARTMENTS, JARVIS, OFFICE_NAME,
@@ -9,11 +9,16 @@ import {
 } from "../office-data";
 import { shortId } from "../utils";
 import { loadConfig } from "./config";
-import { claudePrompt, claudeStatus } from "./claude";
 import { getConnectors, connectorsForDept } from "./mcp";
+import { completePrompt } from "./llm";
+import { resolveOfficeMode } from "./office-mode";
+import { loadAgentsConfig } from "./providers";
 import { retrieve, writeDeliverable } from "./brain";
 import { skillsForAgent } from "./skills";
-import { parseCadence } from "./when";
+import { cadenceWithTime, parseCadence } from "./when";
+import { loadPersistedRoutines, savePersistedRoutines } from "./routines-store";
+import { composeBrief, liveFallbackBrief, loadBriefs, ownerContext } from "./briefs";
+import { DEFAULT_TZ } from "./zone";
 import {
   createDeal, listDeals, pipelineSummary, twentyConfigured, updateDeal, type DealStage,
 } from "./twenty";
@@ -25,15 +30,16 @@ import {
   createWorkItem, listWorkItems, planeConfigured, pmSummary, updateWorkItem, type StateGroup,
 } from "./plane";
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
-import {
-  createEmail, emailSummary, listEmails, mauticConfigured, sendEmail,
-} from "./mautic";
+import { buildCadModel } from "./cad";
+import { buildStudioProduction } from "./studio";
+import { formatMcpContext, mcpContextForQuery } from "./mcp-remote";
 
 interface AgentRT { used: number; limit: number; breaker: BreakerState; }
 interface RuntimeState {
   bus: EventEmitter; tasks: Map<string, Task>; routines: Routine[]; connectors: Connector[];
   messages: AgentMessage[]; memory: MemoryEntry[]; agentRT: Map<string, AgentRT>;
   mode: RunMode; modeReason: string; started: boolean; clock?: NodeJS.Timeout;
+  provider: string; providerLabel: string; model: string;
 }
 
 const g = globalThis as unknown as { __orbit?: RuntimeState };
@@ -42,12 +48,15 @@ function state(): RuntimeState {
   if (!g.__orbit) {
     const bus = new EventEmitter();
     bus.setMaxListeners(200);
-    g.__orbit = { bus, tasks: new Map(), routines: [], connectors: [], messages: [], memory: [], agentRT: new Map(), mode: "demo", modeReason: "starting…", started: false };
+    g.__orbit = { bus, tasks: new Map(), routines: [], connectors: [], messages: [], memory: [], agentRT: new Map(), mode: "demo", modeReason: "starting…", started: false, provider: "", providerLabel: "", model: "" };
   }
   const o = g.__orbit;
   if (!o.messages) o.messages = [];
   if (!o.memory) o.memory = [];
   if (!o.agentRT) o.agentRT = new Map();
+  if (!o.provider) o.provider = "";
+  if (!o.providerLabel) o.providerLabel = "";
+  if (!o.model) o.model = "";
   return o;
 }
 
@@ -86,28 +95,41 @@ export function subscribe(fn: (e: OfficeEvent) => void): () => void {
 }
 function emit(e: OfficeEvent) { state().bus.emit("event", e); }
 
+async function applyOfficeMode(force = false) {
+  const s = state();
+  const resolved = await resolveOfficeMode(force);
+  s.mode = resolved.mode;
+  s.modeReason = resolved.reason;
+  s.provider = resolved.provider;
+  s.providerLabel = resolved.providerLabel;
+  s.model = resolved.model;
+  s.connectors = await getConnectors(resolved.mode === "live");
+}
+
 export async function ensureStarted() {
   const s = state();
   if (s.started) return;
   s.started = true;
   const cfg = loadConfig();
-  const status = await claudeStatus();
-  s.mode = status.available ? "live" : "demo";
-  s.modeReason = status.reason;
-  s.connectors = await getConnectors(status.available);
-  if (s.tasks.size === 0) seedDemo(cfg.model);
+  const agents = loadAgentsConfig();
+  await applyOfficeMode();
+  if (s.tasks.size === 0) seedDemo(agents.model || cfg.model);
   seedRoutines();
   startClock();
 }
 export async function getSnapshot(): Promise<OfficeSnapshot> {
   await ensureStarted();
+  await applyOfficeMode();
   const s = state();
-  const cfg = loadConfig();
+  const agents = loadAgentsConfig();
   return {
-    name: OFFICE_NAME, mode: s.mode, modeReason: s.modeReason, model: cfg.model,
+    name: OFFICE_NAME, mode: s.mode, modeReason: s.modeReason,
+    model: s.model || agents.model || "",
+    provider: s.provider, providerLabel: s.providerLabel,
     connectors: s.connectors,
     tasks: [...s.tasks.values()].sort((a, b) => b.createdAt - a.createdAt),
-    routines: s.routines, agents: agentsSnapshot(), usage: { session: 18, week: 42 },
+    routines: s.routines, briefs: snapshotBriefs(s),
+    agents: agentsSnapshot(), usage: { session: 18, week: 42 },
   };
 }
 export function sendMessage(from: string, to: string, body: string, taskId?: string): AgentMessage {
@@ -125,14 +147,16 @@ export function addMemory(agentId: string, text: string): MemoryEntry {
   if (s.memory.length > 1000) s.memory = s.memory.slice(-1000);
   return entry;
 }
+export function emitBrief(brief: import("../types").StoredBrief) {
+  emit({ type: "brief", brief });
+}
+export function listOfficeTasks(): Task[] {
+  return [...state().tasks.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
 export function getHive() { const s = state(); return { messages: s.messages, memory: s.memory }; }
 export function markRead(agentId: string) { const s = state(); for (const m of s.messages) if (m.to === agentId) m.read = true; }
 export async function refreshMode() {
-  const s = state();
-  const status = await claudeStatus(true);
-  s.mode = status.available ? "live" : "demo";
-  s.modeReason = status.reason;
-  s.connectors = await getConnectors(status.available);
+  await applyOfficeMode(true);
   emit({ type: "snapshot", snapshot: await getSnapshot() });
 }
 function heuristicAgent(dept: DeptId, title: string): string {
@@ -145,6 +169,7 @@ function heuristicAgent(dept: DeptId, title: string): string {
     let score = 0;
     for (const term of t.split(/\W+/)) { if (term.length > 3 && hay.includes(term)) score += 1; }
     if (a.lead) score -= 0.5;
+    if (dept === "ops" && a.id === "op_comply" && /\b(cad|bracket|enclos|hilbert|flange|shaft|plate|housing|iot)\b/.test(t)) score += 3;
     if (score > bestScore) { bestScore = score; best = a; }
   }
   return best.id;
@@ -154,7 +179,13 @@ async function routeAgent(dept: DeptId, title: string): Promise<string> {
   if (s.mode === "live") {
     const roster = AGENTS_BY_DEPT[dept].map((a) => `${a.id}: ${a.name} — ${a.does}${a.lead ? " (department lead)" : ""}`).join("\n");
     const prompt = `You are ${JARVIS.name}, the ${JARVIS.role} of an AI office — every agent reports to you. Working through the ${dept} department lead, pick the single best agent id to own this task.\nTask: "${title}"\nAgents:\n${roster}\nReply with only the agent id.`;
-    const out = await claudePrompt(prompt, 30000);
+    const agents = loadAgentsConfig();
+    const out = await completePrompt({
+      provider: (s.provider || agents.provider) as typeof agents.provider,
+      model: s.model || agents.model,
+      prompt,
+      temperature: 0.2,
+    });
     if (out) {
       const id = out.trim().split(/\s|\n/)[0].replace(/[^a-z_]/gi, "");
       if (AGENTS_BY_DEPT[dept].some((a) => a.id === id)) return id;
@@ -174,7 +205,7 @@ export async function createTask(title: string, dept: DeptId, opts: { model?: st
   const task: Task = {
     id: shortId(), title, dept, agentId, agentName: agent.name,
     status: blocked ? "blocked" : "backlog", progress: 0, mode: s.mode,
-    model: opts.model || cfg.model, createdAt: Date.now(), updatedAt: Date.now(),
+    model: opts.model || loadAgentsConfig().model || cfg.model, createdAt: Date.now(), updatedAt: Date.now(),
     toolsUsed: [], scheduled: opts.scheduled, routineId: opts.routineId,
     outbound, needsApproval: outbound, deps, origin: opts.origin || "user",
   };
@@ -221,32 +252,43 @@ async function runTask(id: string) {
   let deliverable = "";
   const reads = retrieve(task.title, 3);
   const readTitles = reads.map((r) => r.title);
+  const mcpRows = await mcpContextForQuery(task.title).catch(() => []);
   if (s.mode === "live") {
-    deliverable = (await liveWork(task, agent.does, readTitles)) || demoDeliverable(task, agent.role);
+    deliverable = (await liveWork(task, agent.does, readTitles, mcpRows)) || demoDeliverable(task, agent.role);
   } else {
     await sleep(500);
     deliverable = demoDeliverable(task, agent.role);
   }
   const usedTools = allowed.slice(0, 2);
-  if (task.dept === "sales" && allowed.includes("crm")) {
+  if (allowed.includes("crm")) {
     const crm = await crmForTask(task.title);
     if (crm) { deliverable += `\n\n---\n\n### CRM (${twentyConfigured() ? "Twenty — live" : "Twenty — local"})\n${crm}`; if (!usedTools.includes("crm")) usedTools.unshift("crm"); }
   }
-  if (task.dept === "finance" && allowed.includes("bigcapital")) {
+  if (allowed.includes("bigcapital")) {
     const books = await financeForTask(task.title);
     if (books) { deliverable += `\n\n---\n\n### Books (${bigcapitalConfigured() ? "Bigcapital — live" : "Bigcapital — local"})\n${books}`; if (!usedTools.includes("bigcapital")) usedTools.unshift("bigcapital"); }
   }
-  if ((task.dept === "ops" || task.dept === "emails") && allowed.includes("plane")) {
+  if (allowed.includes("plane")) {
     const pm = await pmForTask(task.title, task.dept, agent.name);
     if (pm) { deliverable += `\n\n---\n\n### Projects (${planeConfigured() ? "Plane — live" : "Plane — local"})\n${pm}`; if (!usedTools.includes("plane")) usedTools.unshift("plane"); }
   }
-  if (task.dept === "marketing") {
-    if (agent.tools.includes("mautic") && allowed.includes("mautic")) {
-      const email = await emailForTask(task.title);
-      if (email) { deliverable += `\n\n---\n\n### Email (${mauticConfigured() ? "Mautic — live" : "Mautic — local"})\n${email}`; if (!usedTools.includes("mautic")) usedTools.unshift("mautic"); }
-    } else if (agent.tools.includes("trypost") && allowed.includes("trypost")) {
-      const social = await socialForTask(task.title, agent.name);
-      if (social) { deliverable += `\n\n---\n\n### Social (${trypostConfigured() ? "TryPost — live" : "TryPost — local"})\n${social}`; if (!usedTools.includes("trypost")) usedTools.unshift("trypost"); }
+  if (allowed.includes("studio")) {
+    const film = await studioForTask(task.title, task.agentId);
+    if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
+  }
+  if (allowed.includes("trypost")) {
+    const social = await socialForTask(task.title, agent.name);
+    if (social) { deliverable += `\n\n---\n\n### Social (${trypostConfigured() ? "TryPost — live" : "TryPost — local"})\n${social}`; if (!usedTools.includes("trypost")) usedTools.unshift("trypost"); }
+  }
+  if (allowed.includes("cad")) {
+    const cad = await cadForTask(task.title, task.agentId);
+    if (cad) { deliverable += `\n\n---\n\n### CAD\n${cad}`; if (!usedTools.includes("cad")) usedTools.unshift("cad"); }
+  }
+  if (mcpRows.length) {
+    deliverable += `\n\n---\n\n### Live MCP\n${formatMcpContext(mcpRows)}`;
+    for (const row of mcpRows) {
+      if (!usedTools.includes(row.key)) usedTools.unshift(row.key);
+      emit({ type: "connector_pulse", key: row.key });
     }
   }
   const notePath = writeDeliverable(task.agentName, task.title, deliverable, readTitles);
@@ -272,10 +314,13 @@ function parseAmount(text: string): number | undefined {
 const STAGE_ORDER: DealStage[] = ["NEW", "SCREENING", "MEETING", "PROPOSAL", "CUSTOMER"];
 async function crmForTask(title: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const wantsCreate = /\b(create|open|add|log|new|start)\b/.test(t) && /\b(deal|opportunity|opp|pipeline|lead)\b/.test(t);
+  const wantsWin = /\b(close|closed|won|win|signed|handoff|hand off|warm transfer)\b/.test(t);
+  const wantsAdvance = /\b(advance|move|progress|next stage|update)\b/.test(t) && /\b(deal|stage|pipeline)\b/.test(t);
+  if (!wantsCreate && !wantsWin && !wantsAdvance && !/\b(deal|crm|pipeline|lead|opportunit|twenty|prospect|sales)\b/.test(t)) {
+    return null;
+  }
   try {
-    const wantsCreate = /\b(create|open|add|log|new|start)\b/.test(t) && /\b(deal|opportunity|opp|pipeline|lead)\b/.test(t);
-    const wantsWin = /\b(close|closed|won|win|signed|handoff|hand off|warm transfer)\b/.test(t);
-    const wantsAdvance = /\b(advance|move|progress|next stage|update)\b/.test(t);
     if (wantsCreate) {
       const amount = parseAmount(title);
       const deal = await createDeal({ name: title.replace(/\s+/g, " ").trim().slice(0, 80), amount, stage: "NEW", closeDate: new Date(Date.now() + 30 * 864e5).toISOString() });
@@ -303,13 +348,16 @@ async function crmForTask(title: string): Promise<string | null> {
 function money(n: number): string { return `$${Math.round(n).toLocaleString()}`; }
 async function financeForTask(title: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const amount = parseAmount(title) || 0;
+  const isBill = /\b(bill|payable|vendor|supplier|contractor|expense)\b/.test(t);
+  const wantsCreate = /\b(raise|create|issue|new|draft|add|record|enter)\b/.test(t);
+  const wantsPay = /\b(pay|paid|payment|settle|remit)\b/.test(t);
+  const wantsReconcile = /\b(reconcile|reconciliation|match|bank)\b/.test(t);
+  const wantsChase = /\b(overdue|chase|remind|aging|outstanding|unpaid)\b/.test(t);
+  if (!wantsCreate && !wantsPay && !wantsReconcile && !wantsChase && !/\b(invoice|bill|payable|finance|books|cash|stripe|bigcapital)\b/.test(t)) {
+    return null;
+  }
   try {
-    const amount = parseAmount(title) || 0;
-    const isBill = /\b(bill|payable|vendor|supplier|contractor|expense)\b/.test(t);
-    const wantsCreate = /\b(raise|create|issue|new|draft|add|record|enter)\b/.test(t);
-    const wantsPay = /\b(pay|paid|payment|settle|remit)\b/.test(t);
-    const wantsReconcile = /\b(reconcile|reconciliation|match|bank)\b/.test(t);
-    const wantsChase = /\b(overdue|chase|remind|aging|outstanding|unpaid)\b/.test(t);
     if (wantsReconcile) {
       const pay = await reconcilePayment();
       if (pay) return `Reconciled payment **${pay.reference || pay.id}** — ${money(pay.amount)} ${pay.type} from/to ${pay.party}.`;
@@ -344,10 +392,13 @@ async function financeForTask(title: string): Promise<string | null> {
 }
 async function pmForTask(title: string, dept: DeptId, agentName: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const wantsCreate = /\b(create|add|open|plan|new|log|file|raise)\b/.test(t) && /\b(task|ticket|issue|work item|work-item|story|project|backlog)\b/.test(t);
+  const wantsDone = /\b(done|complete|completed|finish|finished|ship|shipped|close|closed)\b/.test(t) && /\b(ticket|task|issue|work item|project|plane)\b/.test(t);
+  const wantsStart = /\b(start|begin|pick up|in progress|working on|wip)\b/.test(t) && /\b(ticket|task|issue|work item|project|plane)\b/.test(t);
+  if (!wantsCreate && !wantsDone && !wantsStart && !/\b(plane|project|ticket|sprint|backlog|milestone|pmo|work item)\b/.test(t)) {
+    return null;
+  }
   try {
-    const wantsCreate = /\b(create|add|open|plan|new|log|file|raise)\b/.test(t) && /\b(task|ticket|issue|work item|work-item|story|project|backlog)\b/.test(t);
-    const wantsDone = /\b(done|complete|completed|finish|finished|ship|shipped|close|closed)\b/.test(t);
-    const wantsStart = /\b(start|begin|pick up|in progress|working on|wip)\b/.test(t);
     if (wantsCreate) {
       const stateGroup: StateGroup = dept === "emails" ? "backlog" : "unstarted";
       const item = await createWorkItem({ name: title.replace(/\s+/g, " ").trim().slice(0, 90), priority: /\burgent|asap|critical\b/.test(t) ? "urgent" : /\bhigh\b/.test(t) ? "high" : "medium", stateGroup, assignee: agentName });
@@ -371,66 +422,89 @@ async function pmForTask(title: string, dept: DeptId, agentName: string): Promis
 }
 async function socialForTask(title: string, agentName: string): Promise<string | null> {
   const t = title.toLowerCase();
+  const platforms: string[] = [];
+  for (const [re, name] of [[/\b(x|twitter|tweet)\b/, "X"], [/\blinkedin\b/, "LinkedIn"], [/\binstagram|insta|ig\b/, "Instagram"], [/\bbluesky|bsky\b/, "Bluesky"], [/\bthreads\b/, "Threads"], [/\bfacebook|fb\b/, "Facebook"]] as [RegExp, string][]) {
+    if (re.test(t)) platforms.push(name);
+  }
+  const socialHint = platforms.length > 0 || /\b(post|social|trypost|content calendar|carousel|reel caption)\b/.test(t);
+  if (!socialHint) return null;
   try {
     const wantsPublish = /\b(publish|post now|go live|send it)\b/.test(t);
     const wantsSchedule = /\b(schedule|queue|line up|book)\b/.test(t);
     const wantsCreate = /\b(draft|write|create|compose|post|tweet|announce|share)\b/.test(t);
-    const platforms: string[] = [];
-    for (const [re, name] of [[/\b(x|twitter|tweet)\b/, "X"], [/\blinkedin\b/, "LinkedIn"], [/\binstagram|insta|ig\b/, "Instagram"], [/\bbluesky|bsky\b/, "Bluesky"], [/\bthreads\b/, "Threads"], [/\bfacebook|fb\b/, "Facebook"]] as [RegExp, string][]) {
-      if (re.test(t)) platforms.push(name);
-    }
     if (wantsCreate || wantsPublish || wantsSchedule) {
       const status = wantsPublish ? "PUBLISHED" : wantsSchedule ? "SCHEDULED" : "DRAFT";
       const post = await createPost({ content: title.replace(/\s+/g, " ").trim(), platforms: platforms.length ? platforms : undefined, status, scheduledAt: status === "SCHEDULED" ? new Date(Date.now() + 864e5).toISOString() : null, author: agentName });
       const where = post.platforms.join(", ");
       return `Created **${post.status.toLowerCase()}** post (${post.id})${where ? ` for ${where}` : ""}: “${post.content.slice(0, 80)}”.`;
     }
+    if (!/\b(post|social|linkedin|instagram|tweet|trypost|content calendar)\b/.test(t)) return null;
     const sum = await socialSummary();
     const lines = sum.byState.filter((s) => s.count > 0).map((s) => `- ${s.label}: ${s.count}`);
     return [`Content calendar (${sum.activeChannels}/${sum.channels} channels active, ${sum.totalPosts} posts):`, ...lines, `- **Scheduled next 7 days:** ${sum.scheduledNext7}`].join("\n");
   } catch { return null; }
 }
-async function emailForTask(title: string): Promise<string | null> {
+async function cadForTask(title: string, agentId: string): Promise<string | null> {
   const t = title.toLowerCase();
+  if (!/\b(cad|step|bracket|enclos|housing|flange|shaft|hilbert|infill|3d|solid|mounting plate|mechanical part)\b/.test(t)) {
+    return null;
+  }
   try {
-    const wantsSend = /\b(send|blast|deliver|broadcast)\b/.test(t);
-    const wantsCreate = /\b(draft|write|create|compose|build|new)\b/.test(t) && /\b(email|newsletter|campaign|blast|note)\b/.test(t);
-    if (wantsCreate) {
-      const email = await createEmail({ name: title.replace(/\s+/g, " ").trim().slice(0, 90) });
-      return `Created draft email **${email.name}** (${email.id}) — subject “${email.subject}”.`;
-    }
-    if (wantsSend) {
-      const emails = await listEmails({ limit: 100 });
-      const terms = t.split(/\W+/).filter((w) => w.length > 3);
-      const draft = emails.find((e) => e.status === "DRAFT" && terms.some((k) => e.name.toLowerCase().includes(k) || e.subject.toLowerCase().includes(k))) || emails.find((e) => e.status === "DRAFT");
-      if (draft) { const sent = await sendEmail(draft.id); if (sent) return `Sent **${sent.name}** to ${sent.segment || "its segment"} — ${sent.sentCount.toLocaleString()} recipients.`; }
-    }
-    const sum = await emailSummary();
-    return [`Email snapshot:`, `- Emails: ${sum.totalEmails} (${sum.sent} sent, ${sum.drafts} draft)`, `- Total sent: ${sum.totalSent.toLocaleString()} · Avg open rate: ${sum.avgOpenRate}%`, `- Campaigns: ${sum.campaigns} · Contacts: ${sum.contacts.toLocaleString()}`].join("\n");
-  } catch { return null; }
+    const { model } = buildCadModel(title, agentId);
+    if (!model) return null;
+    return `Built **${model.title}** (${model.solids.length} solids) on [/cad](/cad). ${model.steps[0]?.text || ""}`;
+  } catch {
+    return null;
+  }
+}
+async function studioForTask(title: string, agentId: string): Promise<string | null> {
+  const t = title.toLowerCase();
+  if (!/\b(video|film|reel|trailer|explainer|documentary|talking.?head|montage|spot|commercial|studio|cinematic)\b/.test(t)) {
+    return null;
+  }
+  try {
+    const { model } = buildStudioProduction(title, agentId);
+    if (!model) return null;
+    return `Cut **${model.title}** (${model.shots.length} shots, ${model.runtimeSec}s) on [/studio](/studio). ${model.logline}`;
+  } catch {
+    return null;
+  }
 }
 function extractParty(title: string): string | null {
   const m = title.match(/\b(?:for|from|to)\s+([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,3})/);
   return m ? m[1].replace(/\s+(worth|at|of|for|due).*$/i, "").trim() : null;
 }
-async function liveWork(task: Task, does: string, readTitles: string[]): Promise<string | null> {
+async function liveWork(
+  task: Task,
+  does: string,
+  readTitles: string[],
+  mcpRows: { name: string; text: string }[] = [],
+): Promise<string | null> {
   const cfg = loadConfig();
+  const agents = loadAgentsConfig();
   const s = state();
   const skills = skillsForAgent(task.agentId, task.dept);
   const notes = retrieve(task.title, 3).map((d) => `## ${d.title}\n${d.content.slice(0, 800)}`).join("\n\n");
   const skillText = skills.map((sk) => `### Skill: ${sk.name}\n${sk.body.slice(0, 1200)}`).join("\n\n");
   const allowedServers = connectorsForDept(s.connectors, task.dept).map((c) => c.name).join(", ");
+  const mcpText = formatMcpContext(mcpRows);
   const prompt = [
     `You are ${task.agentName}, the ${does} at ${cfg.studio}.`,
     `Standing rule: read freely; send, post, pay, delete or change anything outside this machine ONLY when the task explicitly asks for that exact action.`,
     allowedServers ? `Connectors you may use: ${allowedServers}.` : "",
+    mcpText ? `Live MCP results (do not invent pages that are not listed):\n${mcpText}` : "",
     skillText ? `Follow these skills:\n${skillText}` : "",
     notes ? `Relevant notes from the Brain:\n${notes}` : "",
-    readTitles.length ? `You read: ${readTitles.join(", ")}.` : "",
+    readTitles.join(", ") ? `You read: ${readTitles.join(", ")}.` : "",
     `Task: ${task.title}`,
     `Produce the finished deliverable in Markdown. Be concise and specific.`,
   ].filter(Boolean).join("\n\n");
-  return claudePrompt(prompt, 120000);
+  return completePrompt({
+    provider: (s.provider || agents.provider) as typeof agents.provider,
+    model: s.model || agents.model || task.model,
+    prompt,
+    temperature: agents.temperature,
+  });
 }
 export function actOnTask(id: string, action: "approve" | "reject"): Task | null {
   const s = state();
@@ -442,6 +516,13 @@ export function actOnTask(id: string, action: "approve" | "reject"): Task | null
 }
 function pickDept(text: string): DeptId {
   const t = text.toLowerCase();
+  if (/\b(cad|hilbert|bracket|enclosure|flange|step file|3d model|mechanical part|housing|shaft)\b/.test(t)) return "ops";
+  if (/\b(video|film|reel|trailer|studio|cinematic|explainer|talking.?head|montage)\b/.test(t)) return "marketing";
+  if (/\b(invoice|bill|payable|reconcil|finance|books|overdue|stripe)\b/.test(t)) return "finance";
+  if (/\b(deal|lead|prospect|pipeline|crm|proposal|outbound|inbound)\b/.test(t)) return "sales";
+  if (/\b(ticket|sprint|backlog|milestone|plane|pmo|work item|project plan)\b/.test(t)) return "emails";
+  if (/\b(account|retention|onboard|renewal|client health)\b/.test(t)) return "delivery";
+  if (/\b(post|social|seo|brand|content|campaign|trypost|scrape|apify|instagram|tiktok|krea|generate (an |a )?(image|video))\b/.test(t)) return "marketing";
   let best: DeptId = "ops"; let bestScore = -1;
   for (const d of DEPARTMENTS) {
     const hay = (d.name + " " + AGENTS_BY_DEPT[d.id].map((a) => a.role + " " + a.does).join(" ")).toLowerCase();
@@ -476,25 +557,154 @@ export async function jarvisRoute(instruction: string): Promise<JarvisResult> {
   sendMessage("jarvis", "you", reply);
   return { reply, tasks: created };
 }
-export function addRoutine(title: string, dept: DeptId, cadenceText: string): Routine | null {
-  const parsed = parseCadence(cadenceText);
+export interface AddRoutineOpts {
+  id?: string;
+  kind?: RoutineKind;
+  briefKind?: BriefKind;
+  paused?: boolean;
+  timezone?: string;
+  hour?: number;
+  minute?: number;
+}
+
+function persistRoutines() {
+  savePersistedRoutines(state().routines);
+}
+
+function snapshotBriefs(s: RuntimeState) {
+  const stored = loadBriefs();
+  const tasks = [...s.tasks.values()];
+  const out = [...stored];
+  if (!out.some((b) => b.kind === "morning")) out.push(liveFallbackBrief("morning", tasks));
+  if (!out.some((b) => b.kind === "evening")) out.push(liveFallbackBrief("evening", tasks));
+  return out.slice(0, 12);
+}
+
+export function officeTimezone(): string {
+  try {
+    return ownerContext().timezone || DEFAULT_TZ;
+  } catch {
+    return DEFAULT_TZ;
+  }
+}
+
+export function addRoutine(title: string, dept: DeptId, cadenceText: string, opts: AddRoutineOpts = {}): Routine | null {
+  const timezone = opts.timezone || officeTimezone();
+  const parsed = parseCadence(cadenceText, { timezone });
   if (!parsed) return null;
   const s = state();
-  const routine: Routine = { id: shortId("r"), title, dept, cadence: parsed.cadence, nextRun: parsed.nextRun, paused: false, needsApproval: OUTBOUND.test(title) };
-  s.routines.push(routine);
+  const routine: Routine = {
+    id: opts.id || shortId("r"),
+    title,
+    dept,
+    cadence: parsed.cadence,
+    nextRun: parsed.nextRun,
+    paused: opts.paused ?? false,
+    needsApproval: OUTBOUND.test(title),
+    kind: opts.kind || "task",
+    briefKind: opts.briefKind,
+    timezone,
+    hour: opts.hour ?? parsed.hour,
+    minute: opts.minute ?? parsed.minute,
+  };
+  const existing = s.routines.findIndex((x) => x.id === routine.id);
+  if (existing >= 0) s.routines[existing] = routine;
+  else s.routines.push(routine);
+  persistRoutines();
   emit({ type: "routine", routine });
   return routine;
 }
+
+export function updateRoutine(
+  id: string,
+  patch: Partial<Pick<Routine, "title" | "paused" | "cadence" | "timezone" | "hour" | "minute" | "dept">>,
+): Routine | null {
+  const s = state();
+  const r = s.routines.find((x) => x.id === id);
+  if (!r) return null;
+  if (patch.title !== undefined) r.title = patch.title;
+  if (patch.paused !== undefined) r.paused = patch.paused;
+  if (patch.dept !== undefined) r.dept = patch.dept;
+  if (patch.timezone !== undefined) r.timezone = patch.timezone;
+  if (patch.hour !== undefined) r.hour = patch.hour;
+  if (patch.minute !== undefined) r.minute = patch.minute;
+  const tz = r.timezone || officeTimezone();
+  if (patch.hour !== undefined || patch.minute !== undefined) {
+    const hour = r.hour ?? 8;
+    const minute = r.minute ?? 0;
+    r.cadence = cadenceWithTime(patch.cadence || r.cadence, hour, minute);
+  } else if (patch.cadence !== undefined) {
+    r.cadence = patch.cadence;
+  }
+  const parsed = parseCadence(r.cadence, { timezone: tz, now: Date.now() });
+  if (parsed) {
+    r.cadence = parsed.cadence;
+    r.nextRun = parsed.nextRun;
+    if (parsed.hour !== undefined) r.hour = parsed.hour;
+    if (parsed.minute !== undefined) r.minute = parsed.minute;
+  }
+  r.timezone = tz;
+  persistRoutines();
+  emit({ type: "routine", routine: r });
+  return r;
+}
+
+export function resyncRoutineTimezones(timezone: string) {
+  const s = state();
+  for (const r of s.routines) {
+    r.timezone = timezone;
+    const parsed = parseCadence(r.cadence, { timezone, now: Date.now() });
+    if (parsed) {
+      r.nextRun = parsed.nextRun;
+      if (parsed.hour !== undefined) r.hour = parsed.hour;
+      if (parsed.minute !== undefined) r.minute = parsed.minute;
+    }
+    emit({ type: "routine", routine: r });
+  }
+  persistRoutines();
+}
+
+async function fireRoutine(r: Routine) {
+  const now = Date.now();
+  r.lastRun = now;
+  const tz = r.timezone || officeTimezone();
+  const parsed = parseCadence(r.cadence, { timezone: tz, now: now + 1000 });
+  r.nextRun = parsed ? parsed.nextRun : now + 24 * 3600 * 1000;
+  persistRoutines();
+  emit({ type: "routine", routine: r });
+  if (r.kind === "brief" && r.briefKind) {
+    try {
+      const brief = await composeBrief({ kind: r.briefKind, tasks: [...state().tasks.values()], source: "scheduled" });
+      emit({ type: "brief", brief });
+    } catch {
+      /* next run already advanced */
+    }
+    return;
+  }
+  void createTask(r.title, r.dept, { scheduled: true, routineId: r.id, origin: "routine" });
+}
+
 export function mutateRoutine(id: string, action: "pause" | "resume" | "run" | "delete"): Routine[] {
   const s = state();
   const r = s.routines.find((x) => x.id === id);
   if (!r) return s.routines;
-  if (action === "delete") { s.routines = s.routines.filter((x) => x.id !== id); }
-  else if (action === "pause") { r.paused = true; emit({ type: "routine", routine: r }); }
-  else if (action === "resume") { r.paused = false; emit({ type: "routine", routine: r }); }
-  else if (action === "run") { r.lastRun = Date.now(); void createTask(r.title, r.dept, { scheduled: true, routineId: r.id }); emit({ type: "routine", routine: r }); }
+  if (action === "delete") {
+    s.routines = s.routines.filter((x) => x.id !== id);
+    persistRoutines();
+  } else if (action === "pause") {
+    r.paused = true;
+    persistRoutines();
+    emit({ type: "routine", routine: r });
+  } else if (action === "resume") {
+    r.paused = false;
+    persistRoutines();
+    emit({ type: "routine", routine: r });
+  } else if (action === "run") {
+    void fireRoutine(r);
+  }
   return s.routines;
 }
+
 function startClock() {
   const s = state();
   if (s.clock) return;
@@ -503,22 +713,96 @@ function startClock() {
     for (const r of s.routines) {
       if (r.paused) continue;
       if (r.nextRun <= now) {
-        r.lastRun = now;
-        const parsed = parseCadence(r.cadence);
-        r.nextRun = parsed ? parsed.nextRun : now + 24 * 3600 * 1000;
-        void createTask(r.title, r.dept, { scheduled: true, routineId: r.id });
-        emit({ type: "routine", routine: r });
+        void fireRoutine(r);
       }
     }
   }, 5000);
   if (typeof s.clock.unref === "function") s.clock.unref();
 }
+
+const DEFAULT_ROUTINE_SEEDS: Array<{
+  id: string;
+  title: string;
+  dept: DeptId;
+  cadence: string;
+  kind: RoutineKind;
+  briefKind?: BriefKind;
+  paused: boolean;
+}> = [
+  {
+    id: "r_morning_brief",
+    title: "Morning brief",
+    dept: "ops",
+    cadence: "every weekday at 8am",
+    kind: "brief",
+    briefKind: "morning",
+    paused: false,
+  },
+  {
+    id: "r_evening_wrap",
+    title: "Evening wrap",
+    dept: "ops",
+    cadence: "every weekday at 6pm",
+    kind: "brief",
+    briefKind: "evening",
+    paused: false,
+  },
+  {
+    id: "r_inbox_triage",
+    title: "Triage the inbox and tell me what needs me",
+    dept: "emails",
+    cadence: "every weekday at 8am",
+    kind: "task",
+    paused: true,
+  },
+  {
+    id: "r_overdue_invoices",
+    title: "List overdue invoices and draft the reminders",
+    dept: "finance",
+    cadence: "every Monday at 9am",
+    kind: "task",
+    paused: true,
+  },
+  {
+    id: "r_competitor_scan",
+    title: "Weekly competitor pricing scan",
+    dept: "marketing",
+    cadence: "every Monday at 7am",
+    kind: "task",
+    paused: true,
+  },
+];
+
 function seedRoutines() {
   const s = state();
   if (s.routines.length) return;
-  addRoutine("Triage the inbox and tell me what needs me", "emails", "every weekday at 8am");
-  addRoutine("List overdue invoices and draft the reminders", "finance", "every Monday at 9am");
-  addRoutine("Weekly competitor pricing scan", "marketing", "every Monday at 7am");
+  const loaded = loadPersistedRoutines();
+  const tz = officeTimezone();
+  if (loaded.length) {
+    s.routines = loaded.map((r) => {
+      const timezone = r.timezone || tz;
+      const parsed = parseCadence(r.cadence, { timezone });
+      return {
+        ...r,
+        kind: r.kind || (r.briefKind ? "brief" : "task"),
+        timezone,
+        nextRun: parsed?.nextRun ?? r.nextRun,
+        hour: r.hour ?? parsed?.hour,
+        minute: r.minute ?? parsed?.minute,
+      };
+    });
+  }
+  for (const seed of DEFAULT_ROUTINE_SEEDS) {
+    if (s.routines.some((r) => r.id === seed.id || (seed.briefKind && r.briefKind === seed.briefKind))) continue;
+    addRoutine(seed.title, seed.dept, seed.cadence, {
+      id: seed.id,
+      kind: seed.kind,
+      briefKind: seed.briefKind,
+      paused: seed.paused,
+      timezone: tz,
+    });
+  }
+  persistRoutines();
 }
 function seedDemo(model: string) {
   const s = state();

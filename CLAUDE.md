@@ -22,7 +22,7 @@ them safely.
 
 `src/lib/server/`:
 - `claude.ts` — detects the CLI and runs `claude -p`. Never give agents Bash or file tools.
-- `mcp.ts` — parses `claude mcp list`, applies allow/deny and department wiring.
+- `mcp.ts` — live remote MCP (HTTP/SSE + OAuth or token) plus Claude `mcp list` when the CLI exists; department platforms stay separate.
 - `brain.ts` — reads notes, builds the graph, retrieves relevant notes, writes deliverables.
 - `skills.ts`, `routines.ts`, `when.ts` — skills and the routines clock / cadence parser.
 - `runtime.ts` — the in-memory office: routing, the run loop, demo vs live, the event bus.

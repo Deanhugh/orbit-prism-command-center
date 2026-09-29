@@ -11,9 +11,10 @@ const PRIMARY = [
 
 const REST = [
   { href: "/marketing", label: "Marketing" },
-  { href: "/email", label: "Email" },
+  { href: "/studio", label: "Studio" },
   { href: "/sales", label: "Sales" },
   { href: "/pmo", label: "PMO" },
+  { href: "/cad", label: "CAD" },
   { href: "/finance", label: "Finance" },
   { href: "/vault", label: "Vault" },
 ] as const;

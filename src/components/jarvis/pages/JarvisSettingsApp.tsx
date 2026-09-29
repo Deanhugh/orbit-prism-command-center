@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import {
+  AlarmClock,
   BookOpen,
   Building2,
   Handshake,
@@ -20,6 +21,7 @@ import type { JarvisHub, JarvisProfile } from "@/lib/jarvis-data";
 import { SETTINGS_TABS, settingsHref, type SettingsTab } from "@/lib/jarvis-settings";
 import { AccountPanel, AppearancePanel, CrmPanel, GreetingsPanel } from "./SettingsPanels";
 import { Connectors, Providers, Skills } from "@/components/settings/SettingsPage";
+import { Routines } from "@/components/settings/settings-routines";
 import { defaultAppearance } from "@/lib/jarvis-appearance";
 import { defaultCrmTaxonomy, defaultGreetings } from "@/lib/jarvis-data";
 
@@ -30,6 +32,7 @@ const TAB_ICON: Record<SettingsTab, typeof Settings2> = {
   Providers: KeyRound,
   MCP: Plug,
   Skills: BookOpen,
+  Routines: AlarmClock,
   "Social CRM": Handshake,
   Greetings: MessageCircle,
   Sidecar: Building2,
@@ -166,6 +169,7 @@ export function JarvisSettingsApp({
             <Skills />
           </div>
         ) : null}
+        {tab === "Routines" ? <Routines /> : null}
         {tab === "Social CRM" ? (
           <CrmPanel value={hub?.crm ?? defaultCrmTaxonomy()} onChange={(crm) => save({ crm })} />
         ) : null}

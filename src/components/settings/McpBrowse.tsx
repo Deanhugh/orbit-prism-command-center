@@ -13,6 +13,9 @@ export interface McpCatalogRow {
   command: string;
   transport: "stdio" | "http" | "sse";
   enabled?: boolean;
+  remote?: boolean;
+  auth?: "none" | "bearer" | "oauth";
+  hint?: string;
 }
 
 function Tile({ name, id, children }: { name: string; id?: string; children?: ReactNode }) {
@@ -85,7 +88,7 @@ export function McpBrowse({
           <div key={item.id} className="flex items-center gap-2.5 rounded-lg border border-line bg-panel p-2.5">
             <Tile name={item.name} id={item.id} />
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-semibold">{item.name}</p>
+              <p className="text-[12px] font-semibold">{item.name}{item.remote ? <span className="ml-1 text-[8px] font-bold uppercase tracking-wide text-ink-soft">remote</span> : null}</p>
               <p className="truncate text-[10px] text-ink-soft">{item.description}</p>
             </div>
             <button

@@ -63,7 +63,7 @@ export async function providerStatus(id: ProviderId): Promise<{ ok: boolean; rea
     try {
       const res = await fetch(`${b}/models`, {
         headers: authHeaders(id),
-        signal: AbortSignal.timeout(1500),
+        signal: AbortSignal.timeout(def.local ? 1500 : 4000),
       });
       if (res.ok) return { ok: true, reason: "reachable" };
       last = `HTTP ${res.status}`;
@@ -120,6 +120,27 @@ function authHeaders(id: ProviderId): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
   if (key) h["Authorization"] = `Bearer ${key}`;
   return h;
+}
+
+/** Collect a full reply from the configured provider. Used by office live work. */
+export async function completePrompt(opts: {
+  provider: ProviderId;
+  model: string;
+  prompt: string;
+  temperature?: number;
+}): Promise<string | null> {
+  let content = "";
+  for await (const ev of chatStream({
+    provider: opts.provider,
+    model: opts.model,
+    messages: [{ role: "user", content: opts.prompt }],
+    temperature: opts.temperature,
+  })) {
+    if (ev.type === "token") content += ev.text;
+    if (ev.type === "done") content = ev.content || content;
+    if (ev.type === "error") return content || null;
+  }
+  return content.trim() || null;
 }
 
 /** Main entry: streams tokens + tool steps, runs a tool-calling loop, ends with 'done'. */

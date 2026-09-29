@@ -248,16 +248,20 @@ export function Providers() {
             tab, paste an Ollama Cloud key below and set the base URL to <code>https://ollama.com/v1</code>.
           </p>
         ) : (
-          <p className="mt-2 text-[10px] text-ink-soft">Recommended: <strong>Ollama</strong> — local models such as <code>qwen2.5:7b</code> and Ollama Cloud <code>:cloud</code> models share this same provider. If a provider isn&apos;t reachable, agents fall back to demo automatically.</p>
+          <p className="mt-2 text-[10px] text-ink-soft">
+            On Railway pick <strong>OpenRouter</strong> — one key, every major model (Claude, GPT, Gemini, Llama, Grok).
+            Ollama Cloud is the fallback if you only want Ollama&apos;s catalog. Local Ollama at <code>127.0.0.1:11434</code> only works on the Mac.
+            When the selected provider is reachable, the office badge turns <strong>Live</strong> and Demo stays off.
+          </p>
         )}
       </section>
       <section className="rounded-lg border border-line bg-panel p-4">
-        <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Ollama setup</h2>
+        <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Railway · OpenRouter (recommended)</h2>
         <ol className="list-decimal space-y-1 pl-4 text-[11px] text-ink-soft">
-          <li>This Cursor preview cannot talk to Ollama on the Mac. Test against <code>127.0.0.1:11434</code> will stay red here.</li>
-          <li>On the Mac Terminal: <code>curl http://127.0.0.1:11434/api/tags</code> — that must work before any local Test can pass.</li>
-          <li>To use this preview: create a key at ollama.com, paste it in the Ollama API key field, set Base URL to <code>https://ollama.com/v1</code>, Save, Test.</li>
-          <li>To use local <code>qwen2.5:7b</code>: run Orbit Prism with <code>npm run dev</code> on the Mac mini itself, then open that machine&apos;s localhost:43140.</li>
+          <li>Create a key at <a className="underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>. Put it in Railway as <code>OPENROUTER_API_KEY</code>, or paste it in the OpenRouter row below.</li>
+          <li>Set Active provider to <strong>OpenRouter</strong>. Base URL stays <code>https://openrouter.ai/api/v1</code>.</li>
+          <li>Pick any model OpenRouter lists (Claude, GPT, Gemini, Llama, Grok) and Save. Click Test — the header should read <strong>Live · OpenRouter</strong>.</li>
+          <li>Ollama Cloud is optional: key at ollama.com, base URL <code>https://ollama.com/v1</code>. Local Ollama only works when this app runs on the Mac.</li>
         </ol>
       </section>
 

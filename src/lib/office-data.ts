@@ -84,12 +84,12 @@ export const DEPT_MAP: Record<DeptId, Department> = Object.fromEntries(
 ) as Record<DeptId, Department>;
 
 export const AGENTS: Agent[] = [
-  a("mk_research", "marketing", false, "RESEARCH", "Research Agent", "Scans the market, audience and competitors every day and files what changed — the insight the rest of marketing runs on. Reports to the Chief of Staff.", ["websearch", "notion"]),
-  a("mk_ads", "marketing", false, "AEO / SEO", "AEO & SEO Agent", "Owns search and answer-engine visibility — keywords, technical SEO, and content that ranks and gets cited. Reports to the Chief of Staff.", ["websearch", "notion"]),
-  a("mk_gfx", "marketing", false, "BRAND", "Brand Agent", "Guards the brand — voice, look, and one consistent identity across every asset. Reports to the Chief of Staff.", ["trypost", "canva", "notion"]),
-  a("mk_lead", "marketing", false, "CONTENT STRATEGIST", "Content Strategist", "Owns the content calendar and strategy — turns positioning into a pipeline of content that performs. Reports to the Chief of Staff.", ["trypost", "notion", "canva"]),
-  a("mk_news", "marketing", false, "EMAIL MARKETING", "Email Marketing Agent", "Runs lifecycle and newsletter email — campaigns, sequences, and the note subscribers actually open. Reports to the Chief of Staff.", ["mautic", "gmail"]),
-  a("mk_social", "marketing", false, "SOCIAL MEDIA", "Social Media Strategist", "Runs the social engine across channels — hooks, reels, carousels, and the posting calendar. Reports to the Chief of Staff.", ["trypost", "canva", "notion"]),
+  a("mk_research", "marketing", false, "RESEARCH", "Research Agent", "Scans the market, audience and competitors every day and files what changed — the insight the rest of marketing runs on. Reports to the Chief of Staff.", ["websearch", "notion", "apify"]),
+  a("mk_ads", "marketing", false, "AEO / SEO", "AEO & SEO Agent", "Owns search and answer-engine visibility — keywords, technical SEO, and content that ranks and gets cited. Reports to the Chief of Staff.", ["websearch", "notion", "apify"]),
+  a("mk_gfx", "marketing", false, "BRAND", "Brand Agent", "Guards the brand — voice, look, and one consistent identity across every asset. Reports to the Chief of Staff.", ["trypost", "canva", "notion", "studio", "krea"]),
+  a("mk_lead", "marketing", false, "CONTENT STRATEGIST", "Content Strategist", "Owns the content calendar and strategy — turns positioning into a pipeline of content that performs. Reports to the Chief of Staff.", ["trypost", "notion", "canva", "studio", "krea"]),
+  a("mk_news", "marketing", false, "EMAIL MARKETING", "Email Marketing Agent", "Runs lifecycle and newsletter email — campaigns, sequences, and the note subscribers actually open. Reports to the Chief of Staff.", ["trypost", "gmail"]),
+  a("mk_social", "marketing", false, "SOCIAL MEDIA", "Social Media Strategist", "Runs the social engine across channels — hooks, reels, carousels, and the posting calendar. Reports to the Chief of Staff.", ["trypost", "canva", "notion", "studio", "apify", "krea"]),
   a("em_lead", "emails", true, "PROGRAM MANAGER", "Program Manager", "Owns every project portfolio and leads all the project managers — sets priorities, staffing, and timelines, and reports portfolio status to the Chief of Staff.", ["plane", "notion", "gmail"]),
   a("em_client", "emails", false, "PROJECT MANAGER", "Project Manager", "Owns a portfolio of client projects end to end — scope, plan, milestones, and on-time delivery.", ["plane", "notion", "gmail"]),
   a("em_internal", "emails", false, "PROJECT MANAGER", "Project Manager", "Drives day-to-day delivery across a portfolio of projects — status, sign-offs, and hours; moves things before they slip.", ["plane", "notion", "gmail"]),
@@ -108,11 +108,11 @@ export const AGENTS: Agent[] = [
   a("sl_prospect", "sales", false, "PROSPECTOR", "Outbound Agent", "Builds fresh outbound lists to spec and loads verified prospects into the CRM.", ["crm", "apollo"]),
   a("sl_proposals", "sales", false, "PROPOSALS", "Proposal Agent", "Turns a CRM deal into a proposal and a send-ready email in minutes.", ["crm", "gmail"]),
   a("sl_followup", "sales", false, "FOLLOW UPS", "Revival Agent", "Works the CRM for stalled deals — post-demo silence, quiet pipelines — and revives them.", ["crm", "gmail"]),
-  a("op_lead", "ops", true, "ENGINEERING LEAD", "AI Engineering Lead", "Runs engineering — plans and ships agents, client OS Command Centers, and IoT device specs; can take on any AI engineering task.", ["github", "plane", "notion"]),
-  a("op_intel", "ops", false, "AGENT BUILDER", "Agent Engineering Agent", "Designs and builds new AI agents end to end — prompts, tools, memory, and orchestration.", ["github", "plane", "notion"]),
-  a("op_legal", "ops", false, "COMMAND CENTER ENG", "OS Command Center Engineer", "Builds client OS Command Centers that integrate a fleet of agents into one system.", ["github", "plane", "notion"]),
-  a("op_comply", "ops", false, "IOT ENGINEER", "IoT Solutions Engineer", "Designs and specs IoT devices and wires them into their agent integrations.", ["github", "plane", "notion"]),
-  a("op_dash", "ops", false, "AI INTEGRATIONS", "AI Integrations Engineer", "Wires up models, APIs and data pipelines; handles evals, testing, and deployment.", ["github", "plane", "notion"]),
+  a("op_lead", "ops", true, "ENGINEERING LEAD", "AI Engineering Lead", "Runs engineering — plans and ships agents, client OS Command Centers, and IoT device specs; can take on any AI engineering task.", ["github", "plane", "notion", "cad"]),
+  a("op_intel", "ops", false, "AGENT BUILDER", "Agent Engineering Agent", "Designs and builds new AI agents end to end — prompts, tools, memory, and orchestration.", ["github", "plane", "notion", "cad"]),
+  a("op_legal", "ops", false, "COMMAND CENTER ENG", "OS Command Center Engineer", "Builds client OS Command Centers that integrate a fleet of agents into one system.", ["github", "plane", "notion", "cad"]),
+  a("op_comply", "ops", false, "IOT ENGINEER", "IoT Solutions Engineer", "Designs and specs IoT devices and wires them into their agent integrations.", ["github", "plane", "notion", "cad"]),
+  a("op_dash", "ops", false, "AI INTEGRATIONS", "AI Integrations Engineer", "Wires up models, APIs and data pipelines; handles evals, testing, and deployment.", ["github", "plane", "notion", "cad"]),
   a("fn_lead", "finance", true, "COMPTROLLER", "Comptroller — Head of Finance", "Head of Finance for Orbit Prism — owns all the finances in the books, leads the finance team, and gives the Chief of Staff regular updates on financial operations.", ["bigcapital", "gmail"]),
   a("fn_invoice", "finance", false, "INVOICING", "Finance Agent", "Raises every invoice in the books and chases every overdue — politely and relentlessly.", ["bigcapital", "stripe"]),
   a("fn_payable", "finance", false, "PAYABLES", "Finance Agent", "Records and audits every bill and contractor charge against what we agreed to pay.", ["bigcapital"]),
@@ -152,22 +152,45 @@ export function leadForDept(dept: DeptId): Agent | undefined {
   return AGENTS.find((a) => a.dept === dept && a.lead);
 }
 
+/** Apps every desk may run when Jarvis assigns the work. Ids / seats stay put. */
+const OFFICE_APPS = [
+  "crm",
+  "plane",
+  "bigcapital",
+  "trypost",
+  "studio",
+  "cad",
+  "notion",
+  "gmail",
+  "websearch",
+  "github",
+  "apify",
+  "krea",
+];
+
+for (const ag of AGENTS) {
+  ag.tools = [...new Set([...ag.tools, ...OFFICE_APPS])];
+}
+
+const ALL_DEPTS: DeptId[] = ["marketing", "emails", "delivery", "sales", "ops", "finance"];
+
 export const DEMO_CONNECTORS: Connector[] = [
-  c("Gmail", "gmail", "connected", ["emails", "sales", "delivery", "marketing", "finance"]),
-  c("Notion", "notion", "connected", ["marketing", "ops", "delivery", "sales", "emails"]),
-  c("CRM", "crm", "connected", ["sales"], "Twenty CRM — using local mock data"),
-  c("Bigcapital", "bigcapital", "connected", ["finance"], "Bigcapital — using local mock books"),
-  c("Plane", "plane", "connected", ["ops", "emails"], "Plane — using local mock projects"),
-  c("TryPost", "trypost", "connected", ["marketing"], "TryPost — using local mock posts"),
-  c("Mautic", "mautic", "connected", ["marketing"], "Mautic — using local mock emails"),
-  c("GitHub", "github", "connected", ["ops"]),
+  c("Gmail", "gmail", "connected", ALL_DEPTS),
+  c("Notion", "notion", "connected", ALL_DEPTS),
+  c("CRM", "crm", "connected", ALL_DEPTS, "Twenty CRM — using local mock data"),
+  c("Bigcapital", "bigcapital", "connected", ALL_DEPTS, "Bigcapital — using local mock books"),
+  c("Plane", "plane", "connected", ALL_DEPTS, "Plane — using local mock projects"),
+  c("TryPost", "trypost", "connected", ALL_DEPTS, "TryPost — using local mock posts"),
+  c("Studio", "studio", "connected", ALL_DEPTS, "Orbit Studio — text-to-cut on /studio"),
+  c("CAD Studio", "cad", "connected", ALL_DEPTS, "Orbit CAD — text-to-part on /cad"),
+  c("GitHub", "github", "connected", ALL_DEPTS),
   c("Slack", "slack", "connected", ["emails", "ops"]),
   c("Canva", "canva", "connected", ["marketing", "delivery"]),
   c("Meta Ads", "meta", "connected", ["marketing"]),
   c("Stripe", "stripe", "connected", ["finance"]),
   c("Xero", "xero", "connected", ["finance"]),
   c("Apollo", "apollo", "connected", ["sales"]),
-  c("Web Search", "websearch", "connected", ["marketing", "ops"]),
+  c("Web Search", "websearch", "connected", ALL_DEPTS),
   c("Beehiiv", "beehiiv", "needs_auth", ["marketing"], "Sign in required"),
 ];
 

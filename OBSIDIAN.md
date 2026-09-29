@@ -139,18 +139,33 @@ Use these IDs in a skill's `agents:` list. You can also fetch this live at `/api
 
 ## 5. Where this runs
 
-Because the vault is a folder on disk, this works when the office runs on a machine that can see
-your vault — your **Mac mini** (the primary, live setup). The agents "train" on your notes and
-skills at task time (they are read into the prompt); there is no separate training step.
+**Mac (editor).** Keep Obsidian on the Mac. The vault stays at
+`/Users/howardvernon/Main/Obsidian/Orbit Prism`. `vaultId` `e11eb5f056363b9d` in
+`office.config.json` still attaches the Mac office to that vault. Do not install
+Obsidian.app on Railway.
 
-On a serverless/cloud host the local vault is not present, so either run locally, or sync a copy
-of the vault into the deployment (e.g. a Railway volume) and point `brain` at that path.
+**Railway (agents).** The Command Center volume is mounted at `/app/data`. Point
+`ORBIT_BRAIN` at `/app/data/brain` (not `/app/brain`). The office reads Markdown
+from that folder. If the folder is empty on first boot it is seeded from the
+bundled sample notes so Vault is never blank.
+
+Sync the Mac vault onto the volume when you want Railway to see your real notes:
+
+```bash
+# On the Mac, after you have `railway` CLI linked to command-center
+rsync -av --exclude '.obsidian' --exclude '.trash' \
+  "/Users/howardvernon/Main/Obsidian/Orbit Prism/" \
+  ./orbit-prism-brain/
+# then copy that folder onto the /app/data/brain volume (Railway dashboard
+# file browser, `railway ssh`, or a one-shot scp into the mount).
+```
+
+Obsidian Sync / git / a copy job all work. The agents only need the `.md` files
+and `[[wiki links]]`.
 
 ## What I need from you to finish wiring it
 
-1. The **absolute path** to your OrbitPrism vault on the machine that will run the office
-   (e.g. `/Users/you/Documents/OrbitPrism`).
-2. Whether you want a `skills/` folder created inside the vault with the three sample skills
-   copied in as a starting point.
-
-Give me the path and I'll set `brain` for you and verify the note/skill counts light up.
+1. Keep editing in Obsidian on the Mac.
+2. After you sync the vault into `/app/data/brain`, open Vault — note count
+   should rise above the 10 sample notes, `vaultId` stays as-is, `vaultConnected`
+   stays false on Railway (expected — no Obsidian desktop there).

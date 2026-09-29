@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getConnectors } from "@/lib/server/mcp";
+import { getConnectors, clearRemoteProbeCache } from "@/lib/server/mcp";
 import { claudeStatus, claudeMcpAdd, claudeMcpRemove, type McpTransport } from "@/lib/server/claude";
-import { addCustomConnector, loadConfig, loadCustomConnectors, removeCustomConnector, updateLocalConfig } from "@/lib/server/config";
-import { MCP_CATALOG, parseMcpCommand } from "@/lib/mcp-catalog";
+import {
+  addCustomConnector,
+  loadConfig,
+  loadCustomConnectors,
+  removeCustomConnector,
+  updateLocalConfig,
+} from "@/lib/server/config";
+import { MCP_CATALOG, catalogItemByName, parseMcpCommand } from "@/lib/mcp-catalog";
+import { mcpAccessToken, setMcpTokens, clearMcpTokens, mcpKey } from "@/lib/server/mcp-auth";
+import { probeRemoteConnector, isRemoteTransport } from "@/lib/server/mcp-remote";
+import { normalizeKreaUrl } from "@/lib/server/mcp-krea";
+import { refreshMode } from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-export async function GET() {
+async function payload() {
   const status = await claudeStatus();
-  const connectors = await getConnectors(status.available);
+  const connectors = await getConnectors(true);
   const cfg = loadConfig();
   const deny = cfg.mcp.deny.map((n) => n.toLowerCase());
   const enabledKeys = new Set(
@@ -19,42 +29,85 @@ export async function GET() {
       .filter((c) => c.status !== "denied" && !deny.includes(c.name.toLowerCase()))
       .map((c) => c.key),
   );
-  return NextResponse.json({
-    live: status.available,
-    reason: status.reason,
+  const custom = loadCustomConnectors();
+  return {
+    live: connectors.some((c) => c.kind === "remote" && c.status === "connected") || status.available,
+    reason: status.available
+      ? status.reason
+      : connectors.some((c) => c.kind === "remote" && c.status === "connected")
+        ? "Remote MCP live on this host"
+        : "Add a remote MCP (Notion, Apify, or Krea) with OAuth or a token — npx commands are not live on Railway.",
+    claude: status,
     connectors,
     deny: cfg.mcp.deny,
-    custom: loadCustomConnectors().map((c) => norm(c.name)),
+    custom: custom.map((c) => ({
+      key: norm(c.name),
+      name: c.name,
+      transport: c.transport,
+      target: c.target,
+      auth: c.auth || (isRemoteTransport(c.transport) ? "oauth" : "none"),
+      hasToken: Boolean(mcpAccessToken(c.name)),
+    })),
     catalog: MCP_CATALOG.map((item) => ({
       ...item,
       enabled: enabledKeys.has(item.id) || enabledKeys.has(norm(item.name)) || enabledKeys.has(norm(item.id)),
     })),
-  });
+  };
 }
 
-// Add an MCP / CLI connector (registers with Claude Code when the CLI is present,
-// and saves it locally so it appears here regardless).
+export async function GET() {
+  return NextResponse.json(await payload());
+}
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const name = String(body.name || "").trim();
-  const transport = String(body.transport || "stdio") as McpTransport;
-  let target = String(body.target || "").trim();
-  if (!name || !target) {
-    return NextResponse.json({ error: "name and command/URL are required" }, { status: 400 });
+  if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 });
+
+  if (body.test) {
+    let existing = loadCustomConnectors().find((c) => norm(c.name) === norm(name));
+    const catalog = catalogItemByName(name);
+    if (!existing && catalog?.remote) {
+      addCustomConnector({
+        name: catalog.name,
+        transport: catalog.transport === "sse" ? "sse" : "http",
+        target: catalog.command,
+        addedAt: Date.now(),
+        auth: catalog.auth || "oauth",
+      });
+      existing = loadCustomConnectors().find((c) => norm(c.name) === norm(name));
+    }
+    if (!existing || !isRemoteTransport(existing.transport)) {
+      return NextResponse.json({ error: "Enable a remote MCP (HTTP/SSE) first." }, { status: 400 });
+    }
+    clearRemoteProbeCache();
+    const probe = await probeRemoteConnector(existing, true);
+    try { await refreshMode(); } catch { /* office may not have started */ }
+    return NextResponse.json({ ok: probe.ok, test: probe, ...(await payload()) });
   }
-  if (!["stdio", "sse", "http"].includes(transport)) {
-    return NextResponse.json({ error: "invalid transport" }, { status: 400 });
-  }
+
+  const catalog = catalogItemByName(name);
+  const transport = String(body.transport || catalog?.transport || "stdio") as McpTransport;
+  let target = String(body.target || catalog?.command || "").trim();
   let args = Array.isArray(body.args)
     ? body.args.map(String)
     : typeof body.args === "string" && body.args.trim()
       ? body.args.trim().split(/\s+/)
       : [];
+  if (!["stdio", "sse", "http"].includes(transport)) {
+    return NextResponse.json({ error: "invalid transport" }, { status: 400 });
+  }
   if (transport === "stdio" && args.length === 0 && /\s/.test(target)) {
     const parsed = parseMcpCommand(target);
     target = parsed.target;
     args = parsed.args;
   }
+  if (!target) return NextResponse.json({ error: "command/URL is required" }, { status: 400 });
+  if (norm(name) === "krea" || norm(name) === "kreaai" || /krea\.ai/i.test(target)) {
+    target = normalizeKreaUrl(target);
+  }
+
+  const auth = (body.auth as string) || catalog?.auth || (isRemoteTransport(transport) ? "oauth" : "none");
   const depts = Array.isArray(body.depts) ? body.depts.map(String) : undefined;
 
   const cfg = loadConfig();
@@ -63,36 +116,64 @@ export async function POST(req: NextRequest) {
     updateLocalConfig({ mcp: { ...cfg.mcp, deny } });
   }
 
-  const result = await claudeMcpAdd(name, transport, target, args);
-  addCustomConnector({ name, transport, target, args, depts, addedAt: Date.now() });
+  if (typeof body.token === "string") {
+    const token = body.token.trim();
+    setMcpTokens(mcpKey(name), { token: token || null });
+  }
 
-  const status = await claudeStatus();
-  const connectors = await getConnectors(status.available);
-  return NextResponse.json({ ok: true, ran: result.ran, message: result.message, connectors });
+  if (transport === "stdio") {
+    const result = await claudeMcpAdd(name, transport, target, args);
+    addCustomConnector({ name, transport, target, args, depts, addedAt: Date.now(), auth: "none" });
+    clearRemoteProbeCache();
+    try { await refreshMode(); } catch { /* ignore */ }
+    return NextResponse.json({ ok: true, ran: result.ran, message: result.message, ...(await payload()) });
+  }
+
+  addCustomConnector({
+    name,
+    transport,
+    target,
+    args,
+    depts,
+    addedAt: Date.now(),
+    auth: auth === "bearer" || auth === "none" ? auth : "oauth",
+  });
+  clearRemoteProbeCache();
+  const saved = loadCustomConnectors().find((c) => norm(c.name) === norm(name));
+  const probe = saved ? await probeRemoteConnector(saved, true) : null;
+  try { await refreshMode(); } catch { /* ignore */ }
+  return NextResponse.json({
+    ok: true,
+    ran: false,
+    message: probe?.ok
+      ? `Live — ${probe.reason}`
+      : `Saved ${name}. ${probe?.reason || "Connect with OAuth or paste a token, then Test."}`,
+    test: probe,
+    ...(await payload()),
+  });
 }
 
-// Remove a connector by name.
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const name = String(body.name || "").trim();
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const result = await claudeMcpRemove(name);
   removeCustomConnector(name);
-  const status = await claudeStatus();
-  const connectors = await getConnectors(status.available);
-  return NextResponse.json({ ok: true, ran: result.ran, message: result.message, connectors });
+  clearMcpTokens(mcpKey(name));
+  clearRemoteProbeCache();
+  try { await refreshMode(); } catch { /* ignore */ }
+  return NextResponse.json({ ok: true, ran: result.ran, message: result.message, ...(await payload()) });
 }
 
-// toggle a connector's deny state (allow/deny), saved to office.config.local.json
 export async function PUT(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const name = String(body.name || "");
-  const deny = Boolean(body.deny);
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const cfg = loadConfig();
   const set = new Set(cfg.mcp.deny);
-  if (deny) set.add(name);
+  if (Boolean(body.deny)) set.add(name);
   else set.delete(name);
   updateLocalConfig({ mcp: { ...cfg.mcp, deny: [...set] } });
-  return NextResponse.json({ deny: [...set] });
+  try { await refreshMode(); } catch { /* ignore */ }
+  return NextResponse.json(await payload());
 }

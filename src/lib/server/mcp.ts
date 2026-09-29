@@ -1,34 +1,13 @@
 import type { Connector, DeptId } from "../types";
-import { DEMO_CONNECTORS } from "../office-data";
-import { loadConfig, loadCustomConnectors } from "./config";
+import { loadConfig, loadCustomConnectors, type CustomConnector } from "./config";
 import { claudeMcpListRaw } from "./claude";
 import { twentyConfigured } from "./twenty";
 import { bigcapitalConfigured } from "./bigcapital";
 import { planeConfigured } from "./plane";
 import { trypostConfigured } from "./trypost";
-import { mauticConfigured } from "./mautic";
-
-// Default department wiring for known brands (anything unknown feeds every pod).
-const DEFAULT_WIRING: Record<string, DeptId[]> = {
-  gmail: ["emails", "sales", "delivery"],
-  googledrive: ["delivery", "ops"],
-  notion: ["marketing", "ops", "delivery", "sales"],
-  slack: ["emails", "ops"],
-  canva: ["marketing", "delivery"],
-  meta: ["marketing"],
-  stripe: ["finance"],
-  xero: ["finance"],
-  apollo: ["sales"],
-  clearbit: ["sales"],
-  beehiiv: ["marketing"],
-  websearch: ["marketing", "ops"],
-  crm: ["sales"],
-  bigcapital: ["finance"],
-  plane: ["ops", "emails"],
-  trypost: ["marketing"],
-  mautic: ["marketing"],
-  github: ["ops"],
-};
+import { catalogItemByName } from "../mcp-catalog";
+import { mcpAccessToken, mcpKey } from "./mcp-auth";
+import { clearRemoteProbeCache, isRemoteTransport, probeRemoteConnector } from "./mcp-remote";
 
 const ALL_DEPTS: DeptId[] = [
   "marketing",
@@ -39,15 +18,34 @@ const ALL_DEPTS: DeptId[] = [
   "finance",
 ];
 
-function normKey(name: string): string {
+const DEFAULT_WIRING: Record<string, DeptId[]> = {
+  gmail: ALL_DEPTS,
+  googledrive: ["delivery", "ops"],
+  notion: ALL_DEPTS,
+  slack: ["emails", "ops"],
+  canva: ["marketing", "delivery"],
+  meta: ["marketing"],
+  stripe: ["finance"],
+  xero: ["finance"],
+  apollo: ["sales"],
+  clearbit: ["sales"],
+  beehiiv: ["marketing"],
+  websearch: ALL_DEPTS,
+  crm: ALL_DEPTS,
+  bigcapital: ALL_DEPTS,
+  plane: ALL_DEPTS,
+  trypost: ALL_DEPTS,
+  studio: ALL_DEPTS,
+  github: ALL_DEPTS,
+  apify: ALL_DEPTS,
+  krea: ALL_DEPTS,
+  cad: ALL_DEPTS,
+};
+
+export function normKey(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-/**
- * Parse `claude mcp list` output. The CLI prints lines like:
- *   gmail: https://... - ✓ Connected
- *   stripe: npx ... - ✗ Failed to connect
- */
 function parseMcpList(raw: string): Connector[] {
   const out: Connector[] = [];
   for (const line of raw.split("\n")) {
@@ -62,12 +60,70 @@ function parseMcpList(raw: string): Connector[] {
     out.push({
       name,
       key,
+      kind: "cli",
       status: connected ? "connected" : "needs_auth",
-      reason: connected ? undefined : "Authentication required",
+      reason: connected ? "Claude Code MCP" : "Authentication required",
       depts: DEFAULT_WIRING[key] ?? ALL_DEPTS,
     });
   }
   return out;
+}
+
+function platformConnectors(): Connector[] {
+  const crmLive = twentyConfigured();
+  const booksLive = bigcapitalConfigured();
+  const pmLive = planeConfigured();
+  const socialLive = trypostConfigured();
+  return [
+    {
+      name: "CRM",
+      key: "crm",
+      kind: "platform",
+      status: "connected",
+      reason: crmLive ? "Twenty CRM — live instance connected" : "Twenty CRM — using local mock data",
+      depts: ALL_DEPTS,
+    },
+    {
+      name: "Bigcapital",
+      key: "bigcapital",
+      kind: "platform",
+      status: "connected",
+      reason: booksLive ? "Bigcapital — live instance connected" : "Bigcapital — using local mock books",
+      depts: ALL_DEPTS,
+    },
+    {
+      name: "Plane",
+      key: "plane",
+      kind: "platform",
+      status: "connected",
+      reason: pmLive ? "Plane — live instance connected" : "Plane — using local mock projects",
+      depts: ALL_DEPTS,
+    },
+    {
+      name: "TryPost",
+      key: "trypost",
+      kind: "platform",
+      status: "connected",
+      reason: socialLive ? "TryPost — live instance connected" : "TryPost — using local mock posts",
+      depts: ALL_DEPTS,
+    },
+    {
+      name: "Studio",
+      key: "studio",
+      kind: "native",
+      status: "connected",
+      reason: "Orbit Studio — text-to-cut on /studio",
+      depts: ALL_DEPTS,
+    },
+    {
+      name: "CAD Studio",
+      key: "cad",
+      kind: "native",
+      status: "connected",
+      reason: "Orbit CAD — text-to-part on /cad",
+      depts: ALL_DEPTS,
+    },
+  ];
 }
 
 function applyPolicy(list: Connector[]): Connector[] {
@@ -75,37 +131,12 @@ function applyPolicy(list: Connector[]): Connector[] {
   const allow = cfg.mcp.allow.map(normKey);
   const deny = cfg.mcp.deny.map(normKey);
   const wiring = cfg.mcp.departments;
-  const crmLive = twentyConfigured();
-  const booksLive = bigcapitalConfigured();
-  const pmLive = planeConfigured();
-  const socialLive = trypostConfigured();
-  const emailLive = mauticConfigured();
   return list.map((conn) => {
     let status = conn.status;
     if (deny.includes(conn.key)) status = "denied";
     else if (allow.length && !allow.includes(conn.key)) status = "denied";
     const override = wiring[conn.name] || wiring[conn.key];
-    let reason = status === "denied" ? "Blocked in office.config.json" : conn.reason;
-    // Reflect whether the CRM is talking to a live Twenty instance or the mock.
-    if (conn.key === "crm" && status !== "denied") {
-      reason = crmLive ? "Twenty CRM — live instance connected" : "Twenty CRM — using local mock data";
-    }
-    // Same for the Finance books (Bigcapital).
-    if (conn.key === "bigcapital" && status !== "denied") {
-      reason = booksLive ? "Bigcapital — live instance connected" : "Bigcapital — using local mock books";
-    }
-    // Same for project management (Plane).
-    if (conn.key === "plane" && status !== "denied") {
-      reason = pmLive ? "Plane — live instance connected" : "Plane — using local mock projects";
-    }
-    // Same for marketing (TryPost).
-    if (conn.key === "trypost" && status !== "denied") {
-      reason = socialLive ? "TryPost — live instance connected" : "TryPost — using local mock posts";
-    }
-    // Same for email marketing (Mautic).
-    if (conn.key === "mautic" && status !== "denied") {
-      reason = emailLive ? "Mautic — live instance connected" : "Mautic — using local mock emails";
-    }
+    const reason = status === "denied" ? "Blocked in office.config.json" : conn.reason;
     return {
       ...conn,
       status,
@@ -115,39 +146,67 @@ function applyPolicy(list: Connector[]): Connector[] {
   });
 }
 
-// Connectors the user added from Settings (persisted locally).
-function customConnectors(): Connector[] {
-  return loadCustomConnectors().map((c) => {
-    const key = normKey(c.name);
-    return {
+async function remoteAsConnectors(): Promise<Connector[]> {
+  const rows: Connector[] = [];
+  for (const c of loadCustomConnectors()) {
+    const key = mcpKey(c.name);
+    const cat = catalogItemByName(c.name);
+    const depts = (c.depts as DeptId[] | undefined)?.length ? (c.depts as DeptId[]) : DEFAULT_WIRING[key] ?? ALL_DEPTS;
+    if (isRemoteTransport(c.transport) && /^https?:\/\//i.test(c.target)) {
+      const probe = await probeRemoteConnector(c);
+      const auth = c.auth || cat?.auth || (mcpAccessToken(key) ? "bearer" : "oauth");
+      rows.push({
+        name: c.name,
+        key,
+        kind: "remote",
+        auth,
+        hasToken: Boolean(mcpAccessToken(key)),
+        url: c.target,
+        tools: probe.tools.length || undefined,
+        status: probe.ok ? "connected" : "needs_auth",
+        reason: probe.ok
+          ? `Live MCP · ${probe.reason}`
+          : probe.reason,
+        depts,
+      });
+      continue;
+    }
+    rows.push({
       name: c.name,
       key,
-      status: "connected" as const,
-      reason: c.transport === "stdio" ? `CLI · ${c.target}` : `${c.transport.toUpperCase()} · ${c.target}`,
-      depts: (c.depts as DeptId[] | undefined)?.length ? (c.depts as DeptId[]) : ALL_DEPTS,
-    };
-  });
+      kind: "cli",
+      status: "needs_auth",
+      reason: `Saved command — not live on Railway (${c.target})`,
+      depts,
+      url: c.target,
+    });
+  }
+  return rows;
 }
 
-// Merge custom connectors in, de-duped by key (base list wins on conflicts).
-function mergeCustom(base: Connector[]): Connector[] {
+function mergeByKey(base: Connector[], extra: Connector[]): Connector[] {
   const have = new Set(base.map((c) => c.key));
-  const extra = customConnectors().filter((c) => !have.has(c.key));
-  return [...base, ...extra];
+  return [...base, ...extra.filter((c) => !have.has(c.key))];
 }
 
-export async function getConnectors(live: boolean): Promise<Connector[]> {
-  if (!live) return applyPolicy(mergeCustom(DEMO_CONNECTORS));
+/**
+ * Live remote MCP + department platforms. Demo catalog apps (Gmail, etc.) are
+ * not listed as connected unless Claude Code actually has them, or the owner
+ * added a remote HTTP/SSE URL with a token / OAuth.
+ */
+export async function getConnectors(live = true): Promise<Connector[]> {
+  void live;
+  const platforms = platformConnectors();
+  const remotes = await remoteAsConnectors();
+  let claude: Connector[] = [];
   const raw = await claudeMcpListRaw();
-  const base = (() => {
-    if (!raw) return DEMO_CONNECTORS;
+  if (raw) {
     const parsed = parseMcpList(raw);
-    return parsed.length ? parsed : DEMO_CONNECTORS;
-  })();
-  return applyPolicy(mergeCustom(base));
+    if (parsed.length) claude = parsed;
+  }
+  return applyPolicy(mergeByKey(mergeByKey(platforms, remotes), claude));
 }
 
-/** Connectors an agent may use, given the department wiring and allow/deny. */
 export function connectorsForDept(
   connectors: Connector[],
   dept: DeptId,
@@ -156,3 +215,10 @@ export function connectorsForDept(
     (c) => c.status === "connected" && c.depts.includes(dept),
   );
 }
+
+export function findCustom(name: string): CustomConnector | undefined {
+  const key = normKey(name);
+  return loadCustomConnectors().find((c) => normKey(c.name) === key);
+}
+
+export { clearRemoteProbeCache };

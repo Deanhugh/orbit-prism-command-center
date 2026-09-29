@@ -386,7 +386,7 @@ function RoutineRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="rounded-full bg-ops/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ops">
-              Scheduled
+              {r.kind === "brief" ? (r.briefKind === "evening" ? "Evening wrap" : "Morning brief") : "Scheduled"}
             </span>
             <span className="text-[9px] uppercase tracking-wide text-ink-soft">
               {r.paused ? "paused" : countdown}

@@ -7,12 +7,10 @@ import { shortId } from "../utils";
 import {
   formatClockHM,
   isSameDay,
-  seedEvents,
   seedHabits,
-  seedTasks,
-  startOfDay,
   type JarvisHub,
 } from "../jarvis-data";
+import { composeBrief } from "./briefs";
 
 export interface TodayLine {
   id: string;
@@ -61,12 +59,9 @@ export function todayBriefingText(userId: string, username: string, now = Date.n
 
 function serializeBriefing(hub: JarvisHub, username: string, now: number): string {
   const owner = hub.profile.ownerName || username;
-  const events = [...seedEvents(), ...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const tasks = seedTasks();
+  const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
   const habits = seedHabits();
   const done = new Set(hub.habitsDone ?? []);
-  const todayTasks = tasks.filter((t) => isSameDay(t.due, now) && t.status !== "done");
-  const overdue = tasks.filter((t) => t.due < startOfDay(now) && t.status !== "done");
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
   const laterEvents = events.filter((e) => e.start > now).slice(0, 5);
   const reminders = (hub.reminders ?? []).filter((r) => !r.done).slice(0, 6);
@@ -83,10 +78,7 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
     `Clock: ${formatClockHM(now)}`,
     `Timezone: ${hub.profile.timezone}`,
     `Tagline: ${hub.profile.tagline}`,
-    todayTasks.length
-      ? `Due today: ${todayTasks.map((t) => `${t.title} (${t.project || "no project"}, ${t.status})`).join("; ")}`
-      : "Due today: none",
-    overdue.length ? `Overdue: ${overdue.map((t) => t.title).join("; ")}` : "Overdue: none",
+    `Office board: see CURRENT OFFICE TASKS below or none yet`,
     todayEvents.length
       ? `Today's calendar: ${todayEvents.map((e) => `${formatClockHM(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`).join("; ")}`
       : "Today's calendar: clear",
@@ -114,12 +106,9 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
 /** Snapshot-grounded reply when the configured model is offline. */
 export function todayFallbackReply(userId: string, username: string, text: string, kind?: string): string {
   const hub = readHub(userId, username);
-  const now = Date.now();
   const owner = hub.profile.ownerName || "there";
-  const events = [...seedEvents(), ...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const tasks = seedTasks();
-  const todayTasks = tasks.filter((t) => isSameDay(t.due, now) && t.status !== "done");
-  const overdue = tasks.filter((t) => t.due < startOfDay(now) && t.status !== "done");
+  const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
+  const now = Date.now();
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
   const next = todayEvents[0] || events.find((e) => e.start > now);
   const reminders = (hub.reminders ?? []).filter((r) => !r.done);
@@ -137,17 +126,39 @@ export function todayFallbackReply(userId: string, username: string, text: strin
   if (wantsBrief) {
     const bits = [
       `Good ${nowHourWord()}, ${owner}.`,
-      overdue.length ? `${overdue.length} slipped.` : "Nothing overdue.",
-      todayTasks.length
-        ? `${todayTasks.length} on the board today, starting with ${todayTasks[0].title}.`
-        : "The task board is clear.",
-      next ? `Next block: ${formatClockHM(next.start)} ${next.title}.` : "Calendar is quiet after this.",
       replies[0] ? `${replies[0].name} is still waiting on you.` : "No one is waiting on a reply.",
+      next ? `Next block: ${formatClockHM(next.start)} ${next.title}.` : "Calendar is quiet after this.",
       reminders[0] ? `Reminder: ${reminders[0].title}.` : "",
+      "Ask Settings → Routines to put Morning Brief and Evening Wrap on a clock.",
     ];
     return bits.filter(Boolean).join(" ");
   }
-  return `I am here, ${owner}. Ask for the brief, who is waiting, or what is next on the calendar.`;
+  return `I am here, ${owner}. Ask for the brief, who is waiting, or tell me what to assign — CAD, Studio, CRM, PMO, Finance, or a post.`;
+}
+
+/** True when the owner is asking Jarvis to put a desk to work (not a brief / greeting). */
+export function looksLikeOfficeTask(text: string, kind?: string): boolean {
+  if (kind === "brief") return false;
+  const t = text.toLowerCase().trim();
+  if (!t) return false;
+  if (/^(hi|hello|hey|thanks|thank you|ok|okay|good (morning|afternoon|evening))[\s!.]*$/i.test(t)) {
+    return false;
+  }
+  const briefOnly =
+    /\b(who is waiting|what'?s on|on the board|morning brief|evening wrap|what time|today'?s calendar|habit)\b/.test(t);
+  const hasThenWork = /\b(and then|then |build|create|draft|make|assign)\b/.test(t);
+  if (briefOnly && !hasThenWork) return false;
+  if (
+    /\b(build|create|draft|make|design|film|shoot|cut|post|invoice|bill|reconcil|cad|studio|deal|lead|prospect|research|write|run|assign|schedule|onboard|chase|publish|model|open a|log a|raise|enrich|propose|video|reel|part|bracket)\b/.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (/\b(i need|please |can you |have the |get the |tell the |ask the |go and )\b/.test(t) && t.split(/\s+/).length >= 4) {
+    return true;
+  }
+  return false;
 }
 
 function nowHourWord() {
@@ -167,8 +178,8 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
 
   return [
     `You are ${JARVIS.name}, the ${JARVIS.role} of ${cfg.name}. ${JARVIS.does}`,
-    `You are speaking only in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
-    `You have conversation, briefing, and hybrid type/talk. Write in short spoken-friendly sentences.`,
+    `You are speaking in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
+    `You take typed and spoken instructions. When the owner asks for work, the office already dispatches it to the right desk — confirm the assignment in short spoken-friendly sentences.`,
     `You do not control the desktop, run Python, open apps, send system commands, or use Mark-LIV. If asked for those powers, say they are not on this panel.`,
     `Do not invent calendar items, people, or tasks that are not in the snapshot or this conversation.`,
     briefLine,
@@ -178,18 +189,37 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
 
 export function resolveTodayPrompt(preset: string, text: string): { text: string; kind: "brief" | "chat" } {
   if (preset === "morning") {
-    return { text: "Give me the morning brief from the Command Center snapshot.", kind: "brief" };
+    return { text: "Morning brief.", kind: "brief" };
   }
   if (preset === "evening") {
-    return { text: "Give me the evening wrap from the Command Center snapshot.", kind: "brief" };
+    return { text: "Evening wrap.", kind: "brief" };
   }
   if (preset === "waiting") {
-    return { text: "Who is waiting on a reply?", kind: "chat" };
+    return { text: "Who is waiting?", kind: "chat" };
   }
   return { text: text.trim(), kind: "chat" };
 }
 
 export async function answerTodayChat(userId: string, username: string, text: string, kind: string): Promise<string> {
+  if (kind === "brief" || /^(morning brief|evening wrap)\.?$/i.test(text.trim())) {
+    const briefKind = /evening|wrap/i.test(text) ? "evening" : "morning";
+    const { ensureStarted, listOfficeTasks, emitBrief } = await import("./runtime");
+    await ensureStarted();
+    const brief = await composeBrief({
+      kind: briefKind,
+      tasks: listOfficeTasks(),
+      source: "on-demand",
+    });
+    emitBrief(brief);
+    return brief.narrative;
+  }
+
+  if (looksLikeOfficeTask(text, kind)) {
+    const { jarvisRoute } = await import("./runtime");
+    const routed = await jarvisRoute(text);
+    return routed.reply;
+  }
+
   const { loadAgentsConfig } = await import("./providers");
   const { chatStream, providerStatus } = await import("./llm");
   const cfg = loadAgentsConfig();
@@ -201,10 +231,26 @@ export async function answerTodayChat(userId: string, username: string, text: st
   ]);
   if (!status.ok) return todayFallbackReply(userId, username, text, kind);
 
+  let mcpBlock = "";
+  if (/\b(notion|wiki|workspace page|knowledge base|apify|scrape|instagram|tiktok|facebook|linkedin|serp|google search|krea|generate (an |a )?(image|video)|text[- ]to[- ]image|website|https?:\/\/)\b/i.test(text)) {
+    try {
+      const { formatMcpContext, mcpContextForQuery } = await import("./mcp-remote");
+      mcpBlock = formatMcpContext(await mcpContextForQuery(text));
+    } catch {
+      mcpBlock = "";
+    }
+  }
+
   const history = readTodayChat(userId);
   const prior = history.filter((line) => !(line.role === "user" && line.content === text)).slice(-16);
+  const system = [
+    todaySystemPrompt(userId, username, kind),
+    mcpBlock ? `LIVE MCP RESULTS:\n${mcpBlock}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const messages = [
-    { role: "system" as const, content: todaySystemPrompt(userId, username, kind) },
+    { role: "system" as const, content: system },
     ...prior.map((line) => ({
       role: (line.role === "user" ? "user" : "assistant") as "user" | "assistant",
       content: line.content,
