@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { DeptId } from "@/lib/types";
-import { addRoutine, getSnapshot, mutateRoutine } from "@/lib/server/runtime";
+import type { DeptId, RoutineKind, BriefKind } from "@/lib/types";
+import {
+  addRoutine,
+  getSnapshot,
+  mutateRoutine,
+  updateRoutine,
+} from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +18,19 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const title = String(body.title || "").trim();
-  const dept = body.dept as DeptId;
+  const dept = (body.dept as DeptId) || "ops";
   const cadence = String(body.cadence || "").trim();
-  if (!title || !dept || !cadence) {
-    return NextResponse.json({ error: "title, dept, cadence required" }, { status: 400 });
+  if (!title || !cadence) {
+    return NextResponse.json({ error: "title and cadence required" }, { status: 400 });
   }
-  const routine = addRoutine(title, dept, cadence);
+  const kind = (body.kind as RoutineKind) || "task";
+  const briefKind = body.briefKind as BriefKind | undefined;
+  const routine = addRoutine(title, dept, cadence, {
+    kind,
+    briefKind: kind === "brief" ? briefKind || (title.toLowerCase().includes("evening") ? "evening" : "morning") : undefined,
+    paused: Boolean(body.paused),
+    timezone: typeof body.timezone === "string" ? body.timezone : undefined,
+  });
   if (!routine) {
     return NextResponse.json({ error: "could not read a schedule" }, { status: 400 });
   }
@@ -28,7 +40,23 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const id = String(body.id || "");
-  const action = body.action as "pause" | "resume" | "run" | "delete";
-  const routines = mutateRoutine(id, action);
-  return NextResponse.json({ routines });
+  if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  if (body.action === "pause" || body.action === "resume" || body.action === "run" || body.action === "delete") {
+    const routines = mutateRoutine(id, body.action);
+    return NextResponse.json({ routines });
+  }
+
+  const routine = updateRoutine(id, {
+    title: typeof body.title === "string" ? body.title : undefined,
+    paused: typeof body.paused === "boolean" ? body.paused : undefined,
+    cadence: typeof body.cadence === "string" ? body.cadence : undefined,
+    timezone: typeof body.timezone === "string" ? body.timezone : undefined,
+    hour: typeof body.hour === "number" ? body.hour : undefined,
+    minute: typeof body.minute === "number" ? body.minute : undefined,
+    dept: body.dept as DeptId | undefined,
+  });
+  if (!routine) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const snap = await getSnapshot();
+  return NextResponse.json({ routine, routines: snap.routines });
 }

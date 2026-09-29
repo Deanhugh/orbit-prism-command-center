@@ -15,6 +15,14 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const prev = readHub(user.id, user.username);
   const body = (await req.json().catch(() => ({}))) as Partial<JarvisHub>;
-  return NextResponse.json(patchHub(user.id, user.username, body));
+  const next = patchHub(user.id, user.username, body);
+  const nextTz = next.profile.timezone;
+  if (nextTz && nextTz !== prev.profile.timezone) {
+    const { ensureStarted, resyncRoutineTimezones } = await import("@/lib/server/runtime");
+    await ensureStarted();
+    resyncRoutineTimezones(nextTz);
+  }
+  return NextResponse.json(next);
 }
