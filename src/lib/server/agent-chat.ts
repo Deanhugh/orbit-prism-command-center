@@ -24,7 +24,7 @@ function skillPromptParts(agentId: string, dept: string | null | undefined, pick
     : undefined;
   const rest = matched
     .filter((s) => !picked || s.name !== picked.name)
-    .map((s) => `### Skill: ${s.name}\n${s.body.slice(0, 1000)}`)
+    .map((s) => `### Skill: ${s.name}\n${s.body.slice(0, 2000)}`)
     .join("\n\n");
   return { picked, rest };
 }
@@ -42,7 +42,7 @@ function systemPromptFor(agentId: string, userText: string, opts: ChatOptions = 
       JARVIS.does,
       `When asked to do work, break it into steps, say which agent/department owns each, and flag anything that needs the owner's approval.`,
       `Standing rule: read freely; send, post, pay, delete or change anything outside this machine ONLY when explicitly asked for that exact action.`,
-      picked ? `Apply this skill for this request:\n### Skill: ${picked.name}\n${picked.body.slice(0, 1600)}` : "",
+      picked ? `Apply this skill for this request:\n### Skill: ${picked.name}\n${picked.body.slice(0, 2000)}` : "",
       rest ? `Your other skills:\n${rest}` : "",
       notes ? `Relevant notes from the Brain:\n${notes}` : "",
       planLine(opts.mode),
@@ -56,7 +56,7 @@ function systemPromptFor(agentId: string, userText: string, opts: ChatOptions = 
     `You are ${a.name}, the ${a.role} at ${cfg.studio}. ${a.does}`,
     `Standing rule: read freely; send, post, pay, delete or change anything outside this machine ONLY when explicitly asked for that exact action.`,
     a.tools.length ? `Tools you may use: ${a.tools.join(", ")}.` : "",
-    picked ? `Apply this skill for this request:\n### Skill: ${picked.name}\n${picked.body.slice(0, 1600)}` : "",
+    picked ? `Apply this skill for this request:\n### Skill: ${picked.name}\n${picked.body.slice(0, 2000)}` : "",
     rest ? `Your other skills:\n${rest}` : "",
     notes ? `Relevant notes from the Brain:\n${notes}` : "",
     planLine(opts.mode),

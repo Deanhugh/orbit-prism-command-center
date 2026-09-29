@@ -418,7 +418,7 @@ async function liveWork(task: Task, does: string, readTitles: string[]): Promise
   const s = state();
   const skills = skillsForAgent(task.agentId, task.dept);
   const notes = retrieve(task.title, 3).map((d) => `## ${d.title}\n${d.content.slice(0, 800)}`).join("\n\n");
-  const skillText = skills.map((sk) => `### Skill: ${sk.name}\n${sk.body.slice(0, 1200)}`).join("\n\n");
+  const skillText = skills.map((sk) => `### Skill: ${sk.name}\n${sk.body.slice(0, 2000)}`).join("\n\n");
   const allowedServers = connectorsForDept(s.connectors, task.dept).map((c) => c.name).join(", ");
   const prompt = [
     `You are ${task.agentName}, the ${does} at ${cfg.studio}.`,
