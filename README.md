@@ -79,6 +79,7 @@ skills/
   inbox-triage/SKILL.md
   client-report/SKILL.md
   proposal/SKILL.md
+  agency-content-strategy/SKILL.md
   your-new-skill/SKILL.md
 ```
 
@@ -111,9 +112,9 @@ department: emails
 - `name` — slug shown on the Skills page
 - `description` — one-line summary
 - `agents` — agent ids from the office (`jarvis` / `chief` for the Chief of Staff), or `all`
-- `department` — department id, or `all`
+- `department` — grouping on Settings. A named `agents` list binds only those desks (it does not leak to the whole floor). Jarvis still receives `department: all`.
 
-Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staff`.
+Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staff`, plus one `agency-*` playbook per office desk (33 seats, same ids). Those are condensed from [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents) (MIT) — playbooks only, not new agents and not Bash/file tools. See [`skills/README.md`](skills/README.md).
 
 ## Settings
 

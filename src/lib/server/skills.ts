@@ -170,7 +170,9 @@ export function skillsForAgent(agentId: string, dept?: DeptId | string | null): 
     if (agents.includes(id) || agents.includes("all")) return true;
     if (isChief && (agents.includes("jarvis") || agents.includes("chief"))) return true;
     if (isChief && s.department === "all") return true;
-    if (deptId && (s.department === deptId || s.department === "all")) return true;
+    // Department is grouping metadata when specific desks are named.
+    // A playbook with no agents still applies to its department (or all).
+    if (!agents.length && deptId && (s.department === deptId || s.department === "all")) return true;
     return false;
   });
 }
