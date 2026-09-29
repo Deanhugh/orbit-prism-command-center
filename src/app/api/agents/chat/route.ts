@@ -31,6 +31,15 @@ export async function POST(req: NextRequest) {
   const history = getMessages(convId);
   const responderId = resolveResponder(conv, text);
   const prepared = prepareChat(conv, responderId, history.slice(0, -1), text, { mode, skill });
+  if (/\b(notion|wiki|workspace page|knowledge base)\b/i.test(text) && prepared.messages[0]) {
+    try {
+      const { formatMcpContext, mcpContextForQuery } = await import("@/lib/server/mcp-remote");
+      const block = formatMcpContext(await mcpContextForQuery(text));
+      if (block) prepared.messages[0].content += `\n\nLIVE MCP RESULTS:\n${block}`;
+    } catch {
+      /* remote MCP optional */
+    }
+  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

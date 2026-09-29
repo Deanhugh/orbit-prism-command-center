@@ -167,6 +167,8 @@ export interface CustomConnector {
   args?: string[];
   depts?: string[];
   addedAt: number;
+  /** How Command Center authenticates a remote MCP. stdio stays CLI-only. */
+  auth?: "none" | "bearer" | "oauth";
 }
 
 function customConnectorsFile(): string {

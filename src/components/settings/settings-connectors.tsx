@@ -6,8 +6,40 @@ import { McpBrowse, type McpCatalogRow } from "@/components/settings/McpBrowse";
 import { MCP_CATALOG } from "@/lib/mcp-catalog";
 import { PlatformConnections } from "@/components/settings/settings-platforms";
 
-interface ConnRow { name: string; key: string; status: string; reason?: string }
-interface ConnData { live: boolean; reason: string; connectors: ConnRow[]; deny: string[]; custom: string[]; catalog?: McpCatalogRow[] }
+interface ConnRow {
+  name: string;
+  key: string;
+  status: string;
+  reason?: string;
+  kind?: string;
+  auth?: string;
+  hasToken?: boolean;
+  tools?: number;
+  url?: string;
+}
+interface CustomRow {
+  key: string;
+  name: string;
+  transport: string;
+  target: string;
+  auth?: string;
+  hasToken?: boolean;
+}
+interface ConnData {
+  live: boolean;
+  reason: string;
+  connectors: ConnRow[];
+  deny: string[];
+  custom: CustomRow[] | string[];
+  catalog?: McpCatalogRow[];
+}
+
+function customList(raw: ConnData["custom"]): CustomRow[] {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (typeof raw[0] === "string") return (raw as string[]).map((key) => ({ key, name: key, transport: "http", target: "" }));
+  return raw as CustomRow[];
+}
+
 export function Connectors() {
   const [data, setData] = useState<ConnData | null>({
     live: false,
@@ -18,8 +50,19 @@ export function Connectors() {
     catalog: MCP_CATALOG.map((item) => ({ ...item, enabled: false })),
   });
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [banner] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const q = new URLSearchParams(window.location.search);
+    const ok = q.get("mcp_ok");
+    const err = q.get("mcp_error");
+    if (ok) return `${ok} connected.`;
+    if (err) return err;
+    return "";
+  });
   const load = () => fetch("/api/settings/connectors").then((r) => r.json()).then(setData);
   useEffect(() => { load(); }, []);
+
+  const customs = customList(data?.custom || []);
 
   async function toggle(name: string, deny: boolean) {
     await fetch("/api/settings/connectors", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, deny }) });
@@ -34,16 +77,27 @@ export function Connectors() {
     await fetch("/api/settings/connectors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: item.name, transport: item.transport, target: item.command }),
+      body: JSON.stringify({
+        name: item.name,
+        transport: item.transport,
+        target: item.command,
+        auth: item.auth || (item.remote ? "oauth" : "none"),
+      }),
     });
     await load();
     setBusyId(null);
+    if (item.remote) {
+      document.getElementById("enabled-mcp")?.scrollIntoView({ behavior: "smooth" });
+    }
   }
   async function disable(item: McpCatalogRow) {
     setBusyId(item.id);
-    await toggle(item.name, true);
+    if (item.remote) await remove(item.name);
+    else await toggle(item.name, true);
     setBusyId(null);
   }
+
+  const notion = data?.connectors.find((c) => c.key === "notion");
 
   return (
     <div className="space-y-3">
@@ -51,10 +105,17 @@ export function Connectors() {
         <a href="#browse-mcp" className="rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-canvas">Browse MCP</a>
         <a href="#add-mcp" className="rounded-full border border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink">Add MCP</a>
       </div>
+      {banner ? <p className="rounded-md border border-line bg-panel px-3 py-2 text-[12px] text-ink">{banner}</p> : null}
+
+      <NotionPanel
+        row={notion}
+        onSaved={load}
+      />
+
       <section id="browse-mcp" className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Browse MCP</h2>
         <p className="mb-3 text-[11px] text-ink-soft">
-          Search the catalog, then Enable a server so agents can use that app. The same list is in the chat <strong>+</strong> menu.
+          Remote apps (Notion, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
         </p>
         <McpBrowse
           catalog={data?.catalog || []}
@@ -77,37 +138,26 @@ export function Connectors() {
         </div>
       </details>
 
-      <AddConnector onAdded={load} live={data?.live} />
+      <AddConnector onAdded={load} />
 
-      <section className="rounded-lg border border-line bg-panel p-4">
+      <section id="enabled-mcp" className="rounded-lg border border-line bg-panel p-4">
         <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Enabled MCP servers</h2>
-        <p className="mt-1 text-[11px] text-ink-soft">
-          {data?.live
-            ? "Live from Claude Code on this machine (claude mcp list). Agents can use Enabled servers."
-            : "Claude Code is not running on this host. A green Notion (or other) badge here is the saved catalog, not a live Notion login. Enable the server, then run the Command Center where Claude Code can start that MCP — or add a remote Notion MCP URL under Add a custom MCP."}
-        </p>
+        <p className="mt-1 text-[11px] text-ink-soft">{data?.reason}</p>
       </section>
       <div className="space-y-2">
-        {data?.connectors.map((c) => {
-          const denied = data.deny.some((n) => n.toLowerCase() === c.name.toLowerCase()) || c.status === "denied";
-          const isCustom = data.custom?.includes(c.key);
+        {(data?.connectors || []).map((c) => {
+          const denied = data?.deny.some((n) => n.toLowerCase() === c.name.toLowerCase()) || c.status === "denied";
+          const isCustom = customs.some((x) => x.key === c.key);
           return (
-            <div key={c.key} className="flex items-center gap-2 rounded-lg border border-line bg-panel p-2.5">
-              <span className={cn("h-2 w-2 rounded-full", c.status === "connected" && !denied ? "bg-emails" : denied ? "bg-marketing" : "bg-finance")} />
-              <span className="text-[12px] font-semibold">{c.name}</span>
-              {isCustom && <span className="rounded-full bg-canvas-2 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-soft">added</span>}
-              <span className="truncate text-[10px] text-ink-soft">{denied ? "blocked" : c.status}{c.reason ? ` · ${c.reason}` : ""}</span>
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                <button onClick={() => toggle(c.name, !denied)} className="rounded-md border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft hover:text-ink">
-                  {denied ? "Allow" : "Block"}
-                </button>
-                {isCustom && (
-                  <button onClick={() => remove(c.name)} className="rounded-md border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-marketing hover:opacity-80">
-                    Remove
-                  </button>
-                )}
-              </div>
-            </div>
+            <RemoteRow
+              key={c.key}
+              c={c}
+              denied={Boolean(denied)}
+              isCustom={isCustom}
+              onToggle={() => toggle(c.name, !denied)}
+              onRemove={() => remove(c.name)}
+              onSaved={load}
+            />
           );
         })}
       </div>
@@ -115,8 +165,161 @@ export function Connectors() {
   );
 }
 
-function AddConnector({ onAdded, live }: { onAdded: () => void; live?: boolean }) {
-  const [form, setForm] = useState({ name: "", transport: "stdio", target: "", args: "" });
+function NotionPanel({ row, onSaved }: { row?: ConnRow; onSaved: () => void }) {
+  const live = row?.status === "connected";
+  return (
+    <section className="rounded-lg border border-line bg-panel p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : "bg-finance")} />
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Notion — live remote MCP</h2>
+        <span className="text-[10px] text-ink-soft">{row?.reason || "Not connected yet"}</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+        This is the pattern for every remote app: HTTP URL + OAuth or a Bearer token. Agents search Notion on live tasks.
+        Create an integration at{" "}
+        <a className="underline" href="https://www.notion.so/my-integrations" target="_blank" rel="noreferrer">notion.so/my-integrations</a>
+        {" "}and share pages with it, or use Connect with Notion.
+      </p>
+      <AuthActions name="Notion" url="https://mcp.notion.com/mcp" auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} />
+    </section>
+  );
+}
+
+function AuthActions({
+  name,
+  url,
+  auth,
+  onSaved,
+  hasToken,
+}: {
+  name: string;
+  url?: string;
+  auth?: string;
+  onSaved: () => void;
+  hasToken?: boolean;
+}) {
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+
+  async function saveToken() {
+    if (!token.trim()) return;
+    setBusy("save");
+    setMsg("");
+    const res = await fetch("/api/settings/connectors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, transport: "http", target: url, auth: auth || "bearer", token: token.trim() }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(null);
+    setToken("");
+    setMsg(d.test?.ok ? `Live — ${d.test.reason}` : d.message || d.error || "Saved");
+    onSaved();
+  }
+
+  async function test() {
+    setBusy("test");
+    setMsg("");
+    const res = await fetch("/api/settings/connectors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, test: true }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(null);
+    setMsg(d.test?.ok ? `Test passed — ${d.test.reason}` : d.test?.reason || d.error || "Test failed");
+    onSaved();
+  }
+
+  const oauthHref = `/api/settings/connectors/oauth/start?name=${encodeURIComponent(name)}`;
+
+  return (
+    <div className="mt-3 space-y-2">
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder={hasToken ? "•••• token saved — paste to replace" : "Bearer token (Notion ntn_ / secret_ …)"}
+          className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]"
+        />
+        <button
+          type="button"
+          onClick={saveToken}
+          disabled={busy !== null || !token.trim()}
+          className="rounded-md bg-ink px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-canvas disabled:opacity-40"
+        >
+          {busy === "save" ? "Saving…" : "Save token"}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <a
+          href={oauthHref}
+          className="rounded-md border border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink"
+        >
+          Connect with OAuth
+        </a>
+        <button
+          type="button"
+          onClick={test}
+          disabled={busy !== null}
+          className="rounded-md border border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
+        >
+          {busy === "test" ? "Testing…" : "Test"}
+        </button>
+        {msg ? <span className="text-[11px] text-ink-soft">{msg}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function RemoteRow({
+  c,
+  denied,
+  isCustom,
+  onToggle,
+  onRemove,
+  onSaved,
+}: {
+  c: ConnRow;
+  denied: boolean;
+  isCustom: boolean;
+  onToggle: () => void;
+  onRemove: () => void;
+  onSaved: () => void;
+}) {
+  const remote = c.kind === "remote";
+  return (
+    <div className="rounded-lg border border-line bg-panel p-2.5">
+      <div className="flex items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", c.status === "connected" && !denied ? "bg-emails" : denied ? "bg-marketing" : "bg-finance")} />
+        <span className="text-[12px] font-semibold">{c.name}</span>
+        {c.kind === "remote" && <span className="rounded-full bg-canvas-2 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-soft">remote</span>}
+        {isCustom && <span className="rounded-full bg-canvas-2 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-ink-soft">added</span>}
+        <span className="truncate text-[10px] text-ink-soft">
+          {denied ? "blocked" : c.status}{c.reason ? ` · ${c.reason}` : ""}
+        </span>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <button onClick={onToggle} className="rounded-md border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft hover:text-ink">
+            {denied ? "Allow" : "Block"}
+          </button>
+          {isCustom && (
+            <button onClick={onRemove} className="rounded-md border border-line px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-marketing hover:opacity-80">
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      {remote && !denied ? (
+        <AuthActions name={c.name} url={c.url} auth={c.auth} onSaved={onSaved} hasToken={c.hasToken} />
+      ) : null}
+    </div>
+  );
+}
+
+function AddConnector({ onAdded }: { onAdded: () => void }) {
+  const [form, setForm] = useState({ name: "", transport: "http", target: "", args: "", token: "", auth: "oauth" });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -126,13 +329,20 @@ function AddConnector({ onAdded, live }: { onAdded: () => void; live?: boolean }
     const res = await fetch("/api/settings/connectors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name.trim(), transport: form.transport, target: form.target.trim(), args: form.args.trim() }),
+      body: JSON.stringify({
+        name: form.name.trim(),
+        transport: form.transport,
+        target: form.target.trim(),
+        args: form.args.trim(),
+        auth: form.transport === "stdio" ? "none" : form.auth,
+        token: form.token.trim() || undefined,
+      }),
     });
     const d = await res.json();
     setSaving(false);
     if (d.error) { setMsg(d.error); return; }
-    setMsg(d.ran ? `Connected "${form.name}" — ${d.message}` : `Saved "${form.name}". ${d.message}`);
-    setForm({ name: "", transport: "stdio", target: "", args: "" });
+    setMsg(d.message || `Saved "${form.name}".`);
+    setForm({ name: "", transport: "http", target: "", args: "", token: "", auth: "oauth" });
     onAdded();
   }
 
@@ -141,23 +351,39 @@ function AddConnector({ onAdded, live }: { onAdded: () => void; live?: boolean }
     <section id="add-mcp" className="rounded-lg border border-line bg-panel p-4">
       <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Add a custom MCP</h2>
       <p className="mt-1 text-[11px] text-ink-soft">
-        Not in the catalog? Add your own command or URL. {live ? "Registers with Claude Code live." : "Saved here; run on a machine with Claude Code to register it live."}
+        On Railway pick <strong>Remote — HTTP</strong> and a hosted <code className="text-ink">https://</code> URL, then OAuth or a token. Command (stdio) only works where Claude Code can spawn the process.
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <input placeholder="Name (e.g. github, notion)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]" />
-        <select value={form.transport} onChange={(e) => setForm({ ...form, transport: e.target.value })} className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]">
-          <option value="stdio">Command (stdio)</option>
-          <option value="sse">Remote — SSE</option>
+        <input placeholder="Name (e.g. notion, github)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]" />
+        <select value={form.transport} onChange={(e) => setForm({ ...form, transport: e.target.value, auth: e.target.value === "stdio" ? "none" : "oauth" })} className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]">
           <option value="http">Remote — HTTP</option>
+          <option value="sse">Remote — SSE</option>
+          <option value="stdio">Command (stdio)</option>
         </select>
         <input
-          placeholder={isCmd ? "Command (e.g. npx -y @modelcontextprotocol/server-github)" : "Server URL (https://…)"}
+          placeholder={isCmd ? "Command (e.g. npx -y @modelcontextprotocol/server-github)" : "Server URL (https://mcp.notion.com/mcp)"}
           value={form.target}
           onChange={(e) => setForm({ ...form, target: e.target.value })}
           className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px] sm:col-span-2"
         />
         {isCmd && (
           <input placeholder="Extra args (optional, space-separated)" value={form.args} onChange={(e) => setForm({ ...form, args: e.target.value })} className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px] sm:col-span-2" />
+        )}
+        {!isCmd && (
+          <>
+            <select value={form.auth} onChange={(e) => setForm({ ...form, auth: e.target.value })} className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]">
+              <option value="oauth">Auth — OAuth or token</option>
+              <option value="bearer">Auth — Bearer token only</option>
+              <option value="none">Auth — none</option>
+            </select>
+            <input
+              type="password"
+              placeholder="Token (optional if you will use OAuth)"
+              value={form.token}
+              onChange={(e) => setForm({ ...form, token: e.target.value })}
+              className="rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]"
+            />
+          </>
         )}
       </div>
       <div className="mt-2 flex items-center gap-3">

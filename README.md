@@ -120,6 +120,20 @@ Checked-in examples: `inbox-triage`, `client-report`, `proposal`, `chief-of-staf
 
 Command Center Settings (`/jarvis/settings`) holds General, Appearance, Account, Providers, MCP, Skills, Social CRM, Greetings, and Sidecar. Department platforms (Twenty, Bigcapital, Plane, TryPost) live under **Settings → MCP**. Office **Live** mode follows the provider you pick there (OpenRouter recommended on Railway) — it is not tied to the Claude CLI.
 
+### Remote MCP (Notion first)
+
+On Railway, catalog apps are live only when they are **remote HTTP/SSE** servers with OAuth or a Bearer token. `npx` / stdio MCP is not live on the cloud host.
+
+1. Open **Settings → MCP**.
+2. Use the **Notion — live remote MCP** card (or Enable Notion in Browse MCP).
+3. **Connect with OAuth**, *or* paste an internal integration token (`ntn_` / `secret_`) and **Save token**.
+4. Click **Test**. Green means agents can search the workspace on live tasks.
+5. Share Notion pages with the integration if search returns nothing.
+
+The same card (URL + OAuth or token + Test) is how GitHub, Stripe, and any custom remote MCP connect. OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens sit in `/app/data/secrets.json` on the volume.
+
+Optional env: `NOTION_TOKEN` or `NOTION_API_KEY` (same as pasting the token in Settings).
+
 ## Department platforms on Railway
 
 These are separate Railway projects. Command Center talks to them over HTTP with `*_API_URL` / `*_APP_URL` / `*_API_KEY` (or the Settings card). Do not bake the apps into the Command Center image.

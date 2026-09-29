@@ -32,6 +32,7 @@ import {
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
 import { buildCadModel } from "./cad";
 import { buildStudioProduction } from "./studio";
+import { formatMcpContext, mcpContextForQuery } from "./mcp-remote";
 
 interface AgentRT { used: number; limit: number; breaker: BreakerState; }
 interface RuntimeState {
@@ -251,8 +252,9 @@ async function runTask(id: string) {
   let deliverable = "";
   const reads = retrieve(task.title, 3);
   const readTitles = reads.map((r) => r.title);
+  const mcpRows = await mcpContextForQuery(task.title).catch(() => []);
   if (s.mode === "live") {
-    deliverable = (await liveWork(task, agent.does, readTitles)) || demoDeliverable(task, agent.role);
+    deliverable = (await liveWork(task, agent.does, readTitles, mcpRows)) || demoDeliverable(task, agent.role);
   } else {
     await sleep(500);
     deliverable = demoDeliverable(task, agent.role);
@@ -281,6 +283,13 @@ async function runTask(id: string) {
   if (allowed.includes("cad")) {
     const cad = await cadForTask(task.title, task.agentId);
     if (cad) { deliverable += `\n\n---\n\n### CAD\n${cad}`; if (!usedTools.includes("cad")) usedTools.unshift("cad"); }
+  }
+  if (mcpRows.length) {
+    deliverable += `\n\n---\n\n### Live MCP\n${formatMcpContext(mcpRows)}`;
+    for (const row of mcpRows) {
+      if (!usedTools.includes(row.key)) usedTools.unshift(row.key);
+      emit({ type: "connector_pulse", key: row.key });
+    }
   }
   const notePath = writeDeliverable(task.agentName, task.title, deliverable, readTitles);
   spendBudget(task.agentId, 12 + Math.round(Math.random() * 10));
@@ -465,7 +474,12 @@ function extractParty(title: string): string | null {
   const m = title.match(/\b(?:for|from|to)\s+([A-Z][\w&.'-]*(?:\s+[A-Z][\w&.'-]*){0,3})/);
   return m ? m[1].replace(/\s+(worth|at|of|for|due).*$/i, "").trim() : null;
 }
-async function liveWork(task: Task, does: string, readTitles: string[]): Promise<string | null> {
+async function liveWork(
+  task: Task,
+  does: string,
+  readTitles: string[],
+  mcpRows: { name: string; text: string }[] = [],
+): Promise<string | null> {
   const cfg = loadConfig();
   const agents = loadAgentsConfig();
   const s = state();
@@ -473,10 +487,12 @@ async function liveWork(task: Task, does: string, readTitles: string[]): Promise
   const notes = retrieve(task.title, 3).map((d) => `## ${d.title}\n${d.content.slice(0, 800)}`).join("\n\n");
   const skillText = skills.map((sk) => `### Skill: ${sk.name}\n${sk.body.slice(0, 1200)}`).join("\n\n");
   const allowedServers = connectorsForDept(s.connectors, task.dept).map((c) => c.name).join(", ");
+  const mcpText = formatMcpContext(mcpRows);
   const prompt = [
     `You are ${task.agentName}, the ${does} at ${cfg.studio}.`,
     `Standing rule: read freely; send, post, pay, delete or change anything outside this machine ONLY when the task explicitly asks for that exact action.`,
     allowedServers ? `Connectors you may use: ${allowedServers}.` : "",
+    mcpText ? `Live MCP results (do not invent pages that are not listed):\n${mcpText}` : "",
     skillText ? `Follow these skills:\n${skillText}` : "",
     notes ? `Relevant notes from the Brain:\n${notes}` : "",
     readTitles.join(", ") ? `You read: ${readTitles.join(", ")}.` : "",

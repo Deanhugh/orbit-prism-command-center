@@ -231,10 +231,26 @@ export async function answerTodayChat(userId: string, username: string, text: st
   ]);
   if (!status.ok) return todayFallbackReply(userId, username, text, kind);
 
+  let mcpBlock = "";
+  if (/\b(notion|wiki|workspace page|knowledge base)\b/i.test(text)) {
+    try {
+      const { formatMcpContext, mcpContextForQuery } = await import("./mcp-remote");
+      mcpBlock = formatMcpContext(await mcpContextForQuery(text));
+    } catch {
+      mcpBlock = "";
+    }
+  }
+
   const history = readTodayChat(userId);
   const prior = history.filter((line) => !(line.role === "user" && line.content === text)).slice(-16);
+  const system = [
+    todaySystemPrompt(userId, username, kind),
+    mcpBlock ? `LIVE MCP RESULTS:\n${mcpBlock}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const messages = [
-    { role: "system" as const, content: todaySystemPrompt(userId, username, kind) },
+    { role: "system" as const, content: system },
     ...prior.map((line) => ({
       role: (line.role === "user" ? "user" : "assistant") as "user" | "assistant",
       content: line.content,

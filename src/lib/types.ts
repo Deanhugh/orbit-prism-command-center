@@ -88,12 +88,20 @@ export interface AgentRuntimeInfo {
   breaker: BreakerState;
 }
 
+export type ConnectorKind = "platform" | "native" | "remote" | "cli";
+export type ConnectorAuth = "none" | "bearer" | "oauth";
+
 export interface Connector {
   name: string;
   key: string;
   status: "connected" | "needs_auth" | "denied";
   reason?: string;
   depts: DeptId[];
+  kind?: ConnectorKind;
+  auth?: ConnectorAuth;
+  hasToken?: boolean;
+  tools?: number;
+  url?: string;
 }
 
 export type RoutineKind = "task" | "brief";

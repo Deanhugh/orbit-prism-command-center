@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BookOpen, ChevronRight, Paperclip, Plus, Plug, Search, Upload } from "lucide-react";
 import { MCP_CATALOG } from "@/lib/mcp-catalog";
@@ -54,7 +54,7 @@ export function ComposerPlus({
     await fetch("/api/settings/connectors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: item.name, transport: item.transport, target: item.command }),
+      body: JSON.stringify({ name: item.name, transport: item.transport, target: item.command, auth: item.auth || (item.remote ? "oauth" : "none") }),
     });
     const d = await fetch("/api/settings/connectors").then((r) => r.json()).catch(() => null);
     if (d?.catalog?.length) setCatalog(d.catalog);
@@ -64,11 +64,19 @@ export function ComposerPlus({
   async function disable(item: McpCatalogRow) {
     setBusyId(item.id);
     setCatalog((rows) => rows.map((r) => (r.id === item.id ? { ...r, enabled: false } : r)));
-    await fetch("/api/settings/connectors", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: item.name, deny: true }),
-    });
+    if (item.remote) {
+      await fetch("/api/settings/connectors", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: item.name }),
+      });
+    } else {
+      await fetch("/api/settings/connectors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: item.name, deny: true }),
+      });
+    }
     const d = await fetch("/api/settings/connectors").then((r) => r.json()).catch(() => null);
     if (d?.catalog?.length) setCatalog(d.catalog);
     setBusyId(null);
