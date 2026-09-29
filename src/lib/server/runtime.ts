@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type {
-  AgentMessage, AgentRuntimeInfo, BreakerState, Connector, DeptId,
-  MemoryEntry, OfficeEvent, OfficeSnapshot, Routine, RunMode, Task,
+  AgentMessage, AgentRuntimeInfo, BreakerState, BriefKind, Connector, DeptId,
+  MemoryEntry, OfficeEvent, OfficeSnapshot, Routine, RoutineKind, RunMode, Task,
 } from "../types";
 import {
   AGENTS, AGENTS_BY_DEPT, DEPARTMENTS, JARVIS, OFFICE_NAME,
@@ -15,7 +15,10 @@ import { resolveOfficeMode } from "./office-mode";
 import { loadAgentsConfig } from "./providers";
 import { retrieve, writeDeliverable } from "./brain";
 import { skillsForAgent } from "./skills";
-import { parseCadence } from "./when";
+import { cadenceWithTime, parseCadence } from "./when";
+import { loadPersistedRoutines, savePersistedRoutines } from "./routines-store";
+import { composeBrief, liveFallbackBrief, loadBriefs, ownerContext } from "./briefs";
+import { DEFAULT_TZ } from "./zone";
 import {
   createDeal, listDeals, pipelineSummary, twentyConfigured, updateDeal, type DealStage,
 } from "./twenty";
@@ -124,7 +127,8 @@ export async function getSnapshot(): Promise<OfficeSnapshot> {
     provider: s.provider, providerLabel: s.providerLabel,
     connectors: s.connectors,
     tasks: [...s.tasks.values()].sort((a, b) => b.createdAt - a.createdAt),
-    routines: s.routines, agents: agentsSnapshot(), usage: { session: 18, week: 42 },
+    routines: s.routines, briefs: snapshotBriefs(s),
+    agents: agentsSnapshot(), usage: { session: 18, week: 42 },
   };
 }
 export function sendMessage(from: string, to: string, body: string, taskId?: string): AgentMessage {
@@ -141,6 +145,12 @@ export function addMemory(agentId: string, text: string): MemoryEntry {
   s.memory.push(entry);
   if (s.memory.length > 1000) s.memory = s.memory.slice(-1000);
   return entry;
+}
+export function emitBrief(brief: import("../types").StoredBrief) {
+  emit({ type: "brief", brief });
+}
+export function listOfficeTasks(): Task[] {
+  return [...state().tasks.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 export function getHive() { const s = state(); return { messages: s.messages, memory: s.memory }; }
 export function markRead(agentId: string) { const s = state(); for (const m of s.messages) if (m.to === agentId) m.read = true; }
@@ -531,25 +541,154 @@ export async function jarvisRoute(instruction: string): Promise<JarvisResult> {
   sendMessage("jarvis", "you", reply);
   return { reply, tasks: created };
 }
-export function addRoutine(title: string, dept: DeptId, cadenceText: string): Routine | null {
-  const parsed = parseCadence(cadenceText);
+export interface AddRoutineOpts {
+  id?: string;
+  kind?: RoutineKind;
+  briefKind?: BriefKind;
+  paused?: boolean;
+  timezone?: string;
+  hour?: number;
+  minute?: number;
+}
+
+function persistRoutines() {
+  savePersistedRoutines(state().routines);
+}
+
+function snapshotBriefs(s: RuntimeState) {
+  const stored = loadBriefs();
+  const tasks = [...s.tasks.values()];
+  const out = [...stored];
+  if (!out.some((b) => b.kind === "morning")) out.push(liveFallbackBrief("morning", tasks));
+  if (!out.some((b) => b.kind === "evening")) out.push(liveFallbackBrief("evening", tasks));
+  return out.slice(0, 12);
+}
+
+export function officeTimezone(): string {
+  try {
+    return ownerContext().timezone || DEFAULT_TZ;
+  } catch {
+    return DEFAULT_TZ;
+  }
+}
+
+export function addRoutine(title: string, dept: DeptId, cadenceText: string, opts: AddRoutineOpts = {}): Routine | null {
+  const timezone = opts.timezone || officeTimezone();
+  const parsed = parseCadence(cadenceText, { timezone });
   if (!parsed) return null;
   const s = state();
-  const routine: Routine = { id: shortId("r"), title, dept, cadence: parsed.cadence, nextRun: parsed.nextRun, paused: false, needsApproval: OUTBOUND.test(title) };
-  s.routines.push(routine);
+  const routine: Routine = {
+    id: opts.id || shortId("r"),
+    title,
+    dept,
+    cadence: parsed.cadence,
+    nextRun: parsed.nextRun,
+    paused: opts.paused ?? false,
+    needsApproval: OUTBOUND.test(title),
+    kind: opts.kind || "task",
+    briefKind: opts.briefKind,
+    timezone,
+    hour: opts.hour ?? parsed.hour,
+    minute: opts.minute ?? parsed.minute,
+  };
+  const existing = s.routines.findIndex((x) => x.id === routine.id);
+  if (existing >= 0) s.routines[existing] = routine;
+  else s.routines.push(routine);
+  persistRoutines();
   emit({ type: "routine", routine });
   return routine;
 }
+
+export function updateRoutine(
+  id: string,
+  patch: Partial<Pick<Routine, "title" | "paused" | "cadence" | "timezone" | "hour" | "minute" | "dept">>,
+): Routine | null {
+  const s = state();
+  const r = s.routines.find((x) => x.id === id);
+  if (!r) return null;
+  if (patch.title !== undefined) r.title = patch.title;
+  if (patch.paused !== undefined) r.paused = patch.paused;
+  if (patch.dept !== undefined) r.dept = patch.dept;
+  if (patch.timezone !== undefined) r.timezone = patch.timezone;
+  if (patch.hour !== undefined) r.hour = patch.hour;
+  if (patch.minute !== undefined) r.minute = patch.minute;
+  const tz = r.timezone || officeTimezone();
+  if (patch.hour !== undefined || patch.minute !== undefined) {
+    const hour = r.hour ?? 8;
+    const minute = r.minute ?? 0;
+    r.cadence = cadenceWithTime(patch.cadence || r.cadence, hour, minute);
+  } else if (patch.cadence !== undefined) {
+    r.cadence = patch.cadence;
+  }
+  const parsed = parseCadence(r.cadence, { timezone: tz, now: Date.now() });
+  if (parsed) {
+    r.cadence = parsed.cadence;
+    r.nextRun = parsed.nextRun;
+    if (parsed.hour !== undefined) r.hour = parsed.hour;
+    if (parsed.minute !== undefined) r.minute = parsed.minute;
+  }
+  r.timezone = tz;
+  persistRoutines();
+  emit({ type: "routine", routine: r });
+  return r;
+}
+
+export function resyncRoutineTimezones(timezone: string) {
+  const s = state();
+  for (const r of s.routines) {
+    r.timezone = timezone;
+    const parsed = parseCadence(r.cadence, { timezone, now: Date.now() });
+    if (parsed) {
+      r.nextRun = parsed.nextRun;
+      if (parsed.hour !== undefined) r.hour = parsed.hour;
+      if (parsed.minute !== undefined) r.minute = parsed.minute;
+    }
+    emit({ type: "routine", routine: r });
+  }
+  persistRoutines();
+}
+
+async function fireRoutine(r: Routine) {
+  const now = Date.now();
+  r.lastRun = now;
+  const tz = r.timezone || officeTimezone();
+  const parsed = parseCadence(r.cadence, { timezone: tz, now: now + 1000 });
+  r.nextRun = parsed ? parsed.nextRun : now + 24 * 3600 * 1000;
+  persistRoutines();
+  emit({ type: "routine", routine: r });
+  if (r.kind === "brief" && r.briefKind) {
+    try {
+      const brief = await composeBrief({ kind: r.briefKind, tasks: [...state().tasks.values()], source: "scheduled" });
+      emit({ type: "brief", brief });
+    } catch {
+      /* next run already advanced */
+    }
+    return;
+  }
+  void createTask(r.title, r.dept, { scheduled: true, routineId: r.id, origin: "routine" });
+}
+
 export function mutateRoutine(id: string, action: "pause" | "resume" | "run" | "delete"): Routine[] {
   const s = state();
   const r = s.routines.find((x) => x.id === id);
   if (!r) return s.routines;
-  if (action === "delete") { s.routines = s.routines.filter((x) => x.id !== id); }
-  else if (action === "pause") { r.paused = true; emit({ type: "routine", routine: r }); }
-  else if (action === "resume") { r.paused = false; emit({ type: "routine", routine: r }); }
-  else if (action === "run") { r.lastRun = Date.now(); void createTask(r.title, r.dept, { scheduled: true, routineId: r.id }); emit({ type: "routine", routine: r }); }
+  if (action === "delete") {
+    s.routines = s.routines.filter((x) => x.id !== id);
+    persistRoutines();
+  } else if (action === "pause") {
+    r.paused = true;
+    persistRoutines();
+    emit({ type: "routine", routine: r });
+  } else if (action === "resume") {
+    r.paused = false;
+    persistRoutines();
+    emit({ type: "routine", routine: r });
+  } else if (action === "run") {
+    void fireRoutine(r);
+  }
   return s.routines;
 }
+
 function startClock() {
   const s = state();
   if (s.clock) return;
@@ -558,22 +697,96 @@ function startClock() {
     for (const r of s.routines) {
       if (r.paused) continue;
       if (r.nextRun <= now) {
-        r.lastRun = now;
-        const parsed = parseCadence(r.cadence);
-        r.nextRun = parsed ? parsed.nextRun : now + 24 * 3600 * 1000;
-        void createTask(r.title, r.dept, { scheduled: true, routineId: r.id });
-        emit({ type: "routine", routine: r });
+        void fireRoutine(r);
       }
     }
   }, 5000);
   if (typeof s.clock.unref === "function") s.clock.unref();
 }
+
+const DEFAULT_ROUTINE_SEEDS: Array<{
+  id: string;
+  title: string;
+  dept: DeptId;
+  cadence: string;
+  kind: RoutineKind;
+  briefKind?: BriefKind;
+  paused: boolean;
+}> = [
+  {
+    id: "r_morning_brief",
+    title: "Morning brief",
+    dept: "ops",
+    cadence: "every weekday at 8am",
+    kind: "brief",
+    briefKind: "morning",
+    paused: false,
+  },
+  {
+    id: "r_evening_wrap",
+    title: "Evening wrap",
+    dept: "ops",
+    cadence: "every weekday at 6pm",
+    kind: "brief",
+    briefKind: "evening",
+    paused: false,
+  },
+  {
+    id: "r_inbox_triage",
+    title: "Triage the inbox and tell me what needs me",
+    dept: "emails",
+    cadence: "every weekday at 8am",
+    kind: "task",
+    paused: true,
+  },
+  {
+    id: "r_overdue_invoices",
+    title: "List overdue invoices and draft the reminders",
+    dept: "finance",
+    cadence: "every Monday at 9am",
+    kind: "task",
+    paused: true,
+  },
+  {
+    id: "r_competitor_scan",
+    title: "Weekly competitor pricing scan",
+    dept: "marketing",
+    cadence: "every Monday at 7am",
+    kind: "task",
+    paused: true,
+  },
+];
+
 function seedRoutines() {
   const s = state();
   if (s.routines.length) return;
-  addRoutine("Triage the inbox and tell me what needs me", "emails", "every weekday at 8am");
-  addRoutine("List overdue invoices and draft the reminders", "finance", "every Monday at 9am");
-  addRoutine("Weekly competitor pricing scan", "marketing", "every Monday at 7am");
+  const loaded = loadPersistedRoutines();
+  const tz = officeTimezone();
+  if (loaded.length) {
+    s.routines = loaded.map((r) => {
+      const timezone = r.timezone || tz;
+      const parsed = parseCadence(r.cadence, { timezone });
+      return {
+        ...r,
+        kind: r.kind || (r.briefKind ? "brief" : "task"),
+        timezone,
+        nextRun: parsed?.nextRun ?? r.nextRun,
+        hour: r.hour ?? parsed?.hour,
+        minute: r.minute ?? parsed?.minute,
+      };
+    });
+  }
+  for (const seed of DEFAULT_ROUTINE_SEEDS) {
+    if (s.routines.some((r) => r.id === seed.id || (seed.briefKind && r.briefKind === seed.briefKind))) continue;
+    addRoutine(seed.title, seed.dept, seed.cadence, {
+      id: seed.id,
+      kind: seed.kind,
+      briefKind: seed.briefKind,
+      paused: seed.paused,
+      timezone: tz,
+    });
+  }
+  persistRoutines();
 }
 function seedDemo(model: string) {
   const s = state();
