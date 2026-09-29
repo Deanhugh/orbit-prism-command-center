@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Mic, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVoice } from "@/lib/use-voice";
+import { jarvisSpeechSupported, primeJarvisSpeech, speakJarvis, stopJarvisSpeech } from "@/lib/speak-jarvis";
 import { JarvisCore, type JarvisMood } from "./JarvisCore";
 
 interface Line {
@@ -38,19 +39,50 @@ export function TodayJarvis({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [voiceOut, setVoiceOut] = useState(false);
+  const [voiceOut, setVoiceOut] = useState(true);
   const [speaking, setSpeaking] = useState(false);
+  const [speechOk, setSpeechOk] = useState(true);
   const endRef = useRef<HTMLDivElement>(null);
   const busyRef = useRef(false);
-  const voiceOutRef = useRef(false);
+  const voiceOutRef = useRef(true);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setSpeechOk(jarvisSpeechSupported());
+      try {
+        const saved = localStorage.getItem("jarvis-voice-out");
+        if (saved === "off") {
+          setVoiceOut(false);
+          voiceOutRef.current = false;
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     voiceOutRef.current = voiceOut;
   }, [voiceOut]);
 
+  const setSpeaker = useCallback((on: boolean) => {
+    setVoiceOut(on);
+    voiceOutRef.current = on;
+    try {
+      localStorage.setItem("jarvis-voice-out", on ? "on" : "off");
+    } catch {
+      /* ignore */
+    }
+    if (on) primeJarvisSpeech();
+    else stopJarvisSpeech();
+  }, []);
+
   const send = useCallback(async (text: string, preset?: string) => {
     const trimmed = (preset || text).trim();
     if (!trimmed || busyRef.current) return;
+    if (preset) setSpeaker(true);
+    else if (voiceOutRef.current) primeJarvisSpeech();
     busyRef.current = true;
     if (!preset) setInput("");
     setBusy(true);
@@ -73,14 +105,19 @@ export function TodayJarvis({
       const next = data.messages || [];
       setMessages(next);
       const last = next.filter((l) => l.role === "assistant").at(-1);
-      if (last && voiceOutRef.current) speakReply(last.content, setSpeaking);
+      if (last && voiceOutRef.current) {
+        speakJarvis(last.content, {
+          onStart: () => setSpeaking(true),
+          onEnd: () => setSpeaking(false),
+        });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Jarvis could not take that.");
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
-  }, []);
+  }, [setSpeaker]);
 
   const onVoice = useCallback(
     (text: string) => {
@@ -213,12 +250,18 @@ export function TodayJarvis({
           />
           <button
             type="button"
-            onClick={() => setVoiceOut((v) => !v)}
+            onClick={() => setSpeaker(!voiceOut)}
             className={cn(
               "grid h-9 w-9 shrink-0 place-items-center rounded-full",
               voiceOut ? "bg-cyan text-canvas" : "text-ink-soft hover:text-ink",
             )}
-            title={voiceOut ? "Voice replies on" : "Voice replies off"}
+            title={
+              !speechOk
+                ? "This browser cannot speak. Use Chrome, Edge, or Safari."
+                : voiceOut
+                  ? "Speakers on — Jarvis reads briefs aloud"
+                  : "Speakers off — click to hear Jarvis"
+            }
             aria-pressed={voiceOut}
           >
             {voiceOut ? <Volume2 size={15} /> : <VolumeX size={15} />}
@@ -249,6 +292,9 @@ export function TodayJarvis({
           </button>
         </form>
         {error ? <p className="mt-2 text-[12px] text-marketing">{error}</p> : null}
+        {!speechOk ? (
+          <p className="mt-2 text-[11px] text-ink-soft">Voice out needs Chrome, Edge, or Safari — and the speakers unmuted.</p>
+        ) : null}
       </div>
     </section>
   );
@@ -261,17 +307,4 @@ function displayLine(line: Line) {
   if (/evening wrap/i.test(text)) return "Evening wrap";
   if (/who is waiting/i.test(text)) return "Who is waiting?";
   return text;
-}
-
-function speakReply(text: string, setSpeaking: (v: boolean) => void) {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  const clean = text.replace(/[#*_`>\-]/g, " ").slice(0, 500);
-  const u = new SpeechSynthesisUtterance(clean);
-  u.rate = 1.04;
-  u.pitch = 0.95;
-  u.onstart = () => setSpeaking(true);
-  u.onend = () => setSpeaking(false);
-  u.onerror = () => setSpeaking(false);
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(u);
 }
