@@ -7,7 +7,8 @@ import { PageNav } from "./PageNav";
 
 /**
  * The shared top-right header cluster used on every page, in one order:
- * nav (Agents · Vault · Office · Settings) -> mode badge -> clock.
+ * nav (Jarvis · Agents · PMO · Sales · Finance · Marketing · Studio · CAD · Vault)
+ * -> mode badge -> clock.
  */
 export function HeaderControls({
   tone = "default",
