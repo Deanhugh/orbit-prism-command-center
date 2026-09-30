@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createDeal,
   crmStatus,
+  ensureCrmPeopleBlank,
   listCompanies,
   listDeals,
   listPeople,
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 // Aggregate read for the CRM board.
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams;
+  await ensureCrmPeopleBlank();
   const [status, deals, companies, people, summary] = await Promise.all([
     crmStatus(),
     listDeals({ stage: q.get("stage") || undefined, search: q.get("search") || undefined, limit: 200 }),

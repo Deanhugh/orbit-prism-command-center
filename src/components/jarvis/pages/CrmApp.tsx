@@ -96,7 +96,9 @@ export function CrmApp() {
             {shown.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-10 text-center text-ink-soft">
-                  No connections match that filter.
+                  {rows.length === 0
+                    ? "No contacts yet. Social CRM starts empty — add people from this workspace when you are ready."
+                    : "No connections match that filter."}
                 </td>
               </tr>
             ) : (

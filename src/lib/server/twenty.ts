@@ -47,6 +47,7 @@ export interface Person {
   lastName: string;
   email: string | null;
   companyId: string | null;
+  createdAt?: number;
 }
 
 export interface DealInput {
@@ -164,11 +165,16 @@ async function liveFetch(pathname: string, init?: RequestInit): Promise<unknown>
     headers: authHeaders(),
     signal: AbortSignal.timeout(15000),
   });
+  const text = await res.text().catch(() => "");
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
     throw new Error(`Twenty ${res.status}: ${text.slice(0, 160)}`);
   }
-  return res.json();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return {};
+  }
 }
 
 interface MockDB {
@@ -177,46 +183,44 @@ interface MockDB {
   people: Person[];
 }
 
-const g = globalThis as unknown as { __twentyMock?: MockDB };
+const CRM_PEOPLE_BLANK_GEN = 1;
+
+const g = globalThis as unknown as { __twentyMock?: MockDB; __twentyPeopleBlankGen?: number };
 
 function mockFile() {
   return path.join(dataDir(), "twenty-mock.json");
 }
 
-function seed(): MockDB {
-  const now = new Date().toISOString();
-  const companies: Company[] = [
-    { id: "c_harbourside", name: "Harbourside Ventures", domain: "harbourside.vc", employees: 40 },
-    { id: "c_meridian", name: "Meridian Logistics", domain: "meridianlog.com", employees: 220 },
-    { id: "c_northwind", name: "Northwind Retail", domain: "northwind.store", employees: 85 },
-    { id: "c_lumen", name: "Lumen Health", domain: "lumenhealth.io", employees: 130 },
-  ];
-  const people: Person[] = [
-    { id: "p_amara", firstName: "Amara", lastName: "Okafor", email: "amara@harbourside.vc", companyId: "c_harbourside" },
-    { id: "p_devlin", firstName: "Sam", lastName: "Devlin", email: "sam@meridianlog.com", companyId: "c_meridian" },
-    { id: "p_chen", firstName: "Wei", lastName: "Chen", email: "wei@northwind.store", companyId: "c_northwind" },
-    { id: "p_ruiz", firstName: "Elena", lastName: "Ruiz", email: "elena@lumenhealth.io", companyId: "c_lumen" },
-  ];
-  const deals: Deal[] = [
-    mkSeed("d_hs", "Harbourside — Command Center rollout", 120000, "PROPOSAL", "c_harbourside", "Harbourside Ventures", "p_amara", "Amara Okafor", now, 24),
-    mkSeed("d_mer", "Meridian — IoT fleet pilot", 68000, "MEETING", "c_meridian", "Meridian Logistics", "p_devlin", "Sam Devlin", now, 12),
-    mkSeed("d_nw", "Northwind — Agent build retainer", 42000, "SCREENING", "c_northwind", "Northwind Retail", "p_chen", "Wei Chen", now, 40),
-    mkSeed("d_lum", "Lumen — AI ops platform", 210000, "NEW", "c_lumen", "Lumen Health", "p_ruiz", "Elena Ruiz", now, 55),
-    mkSeed("d_hs2", "Harbourside — Expansion (year 2)", 90000, "CUSTOMER", "c_harbourside", "Harbourside Ventures", "p_amara", "Amara Okafor", now, 5),
-  ];
-  return { companies, people, deals };
+function crmBlankFile() {
+  return path.join(dataDir(), "crm-blank.json");
 }
 
-function mkSeed(id: string, name: string, amount: number, stage: DealStage, companyId: string, companyName: string, contactId: string, contactName: string, now: string, closeInDays: number): Deal {
-  const close = new Date(Date.now() + closeInDays * 864e5).toISOString();
-  return { id, name, amount, currency: "USD", stage, companyId, companyName, contactId, contactName, closeDate: close, createdAt: now, updatedAt: now };
+function emptyStore(): MockDB {
+  return { deals: [], companies: [], people: [] };
 }
 
 function db(): MockDB {
   if (g.__twentyMock) return g.__twentyMock;
   let loaded: MockDB | null = null;
-  try { loaded = JSON.parse(fs.readFileSync(mockFile(), "utf8")); } catch { /* none yet */ }
-  g.__twentyMock = loaded && loaded.deals ? loaded : seed();
+  let peopleBlankGen = 0;
+  try {
+    const raw = JSON.parse(fs.readFileSync(mockFile(), "utf8")) as Partial<MockDB> & { peopleBlankGen?: number };
+    if (raw && (Array.isArray(raw.deals) || Array.isArray(raw.people))) {
+      loaded = {
+        deals: Array.isArray(raw.deals) ? raw.deals : [],
+        companies: Array.isArray(raw.companies) ? raw.companies : [],
+        people: Array.isArray(raw.people) ? raw.people : [],
+      };
+      peopleBlankGen = Number(raw.peopleBlankGen) || 0;
+    }
+  } catch { /* none yet */ }
+  if (peopleBlankGen < CRM_PEOPLE_BLANK_GEN) {
+    g.__twentyMock = { ...(loaded || emptyStore()), people: [] };
+    g.__twentyPeopleBlankGen = CRM_PEOPLE_BLANK_GEN;
+  } else {
+    g.__twentyMock = loaded || emptyStore();
+    g.__twentyPeopleBlankGen = peopleBlankGen;
+  }
   persist();
   return g.__twentyMock;
 }
@@ -224,8 +228,89 @@ function db(): MockDB {
 function persist() {
   try {
     fs.mkdirSync(dataDir(), { recursive: true });
-    fs.writeFileSync(mockFile(), JSON.stringify(g.__twentyMock, null, 2));
+    fs.writeFileSync(
+      mockFile(),
+      JSON.stringify(
+        { peopleBlankGen: g.__twentyPeopleBlankGen ?? CRM_PEOPLE_BLANK_GEN, ...g.__twentyMock },
+        null,
+        2,
+      ),
+    );
   } catch { /* read-only fs */ }
+}
+
+function readCrmBlankState(): { peopleBlankGen: number; wipedAt: number } {
+  try {
+    const raw = JSON.parse(fs.readFileSync(crmBlankFile(), "utf8")) as {
+      peopleBlankGen?: number;
+      wipedAt?: number;
+    };
+    return { peopleBlankGen: Number(raw.peopleBlankGen) || 0, wipedAt: Number(raw.wipedAt) || 0 };
+  } catch {
+    return { peopleBlankGen: 0, wipedAt: 0 };
+  }
+}
+
+function writeCrmBlankState(gen: number, wipedAt: number): void {
+  try {
+    fs.mkdirSync(dataDir(), { recursive: true });
+    fs.writeFileSync(crmBlankFile(), JSON.stringify({ peopleBlankGen: gen, wipedAt }, null, 2));
+  } catch { /* read-only fs */ }
+}
+
+async function listPeopleRaw(limit = 200): Promise<Person[]> {
+  if (twentyConfigured()) {
+    try {
+      const json = await liveFetch(`/rest/people?limit=${limit}`);
+      const arr = unwrap<Record<string, unknown>[]>(json, "people") || [];
+      if (Array.isArray(arr)) return arr.map(normPerson);
+    } catch { /* mock */ }
+  }
+  return db().people.slice();
+}
+
+export async function deletePerson(id: string): Promise<void> {
+  if (twentyConfigured()) {
+    const encoded = encodeURIComponent(id);
+    const attempts = [
+      () => liveFetch(`/rest/people/${encoded}`, { method: "DELETE" }),
+      () =>
+        liveFetch("/graphql", {
+          method: "POST",
+          body: JSON.stringify({
+            query: "mutation DeletePerson($id: UUID!) { deletePerson(id: $id) { id } }",
+            variables: { id },
+          }),
+        }),
+    ];
+    for (const attempt of attempts) {
+      try {
+        await attempt();
+        break;
+      } catch {
+        /* try the next Twenty delete shape */
+      }
+    }
+  }
+  const store = db();
+  store.people = store.people.filter((p) => p.id !== id);
+  persist();
+}
+
+/** One-time wipe of Social CRM people (live Twenty + local mock). */
+export async function ensureCrmPeopleBlank(): Promise<void> {
+  if (readCrmBlankState().peopleBlankGen >= CRM_PEOPLE_BLANK_GEN) return;
+  const wipedAt = Date.now();
+  const store = db();
+  store.people = [];
+  persist();
+  if (twentyConfigured()) {
+    const people = await listPeopleRaw();
+    for (const person of people) {
+      await deletePerson(person.id);
+    }
+  }
+  writeCrmBlankState(CRM_PEOPLE_BLANK_GEN, wipedAt);
 }
 
 function rid(prefix: string): string {
@@ -343,15 +428,13 @@ export async function createCompany(input: { name: string; domain?: string; empl
 }
 
 export async function listPeople(opts: { limit?: number; search?: string } = {}): Promise<Person[]> {
+  await ensureCrmPeopleBlank();
   const limit = Math.min(opts.limit ?? 50, 200);
-  let people: Person[];
-  if (twentyConfigured()) {
-    try {
-      const json = await liveFetch(`/rest/people?limit=${limit}`);
-      const arr = unwrap<Record<string, unknown>[]>(json, "people") || [];
-      people = Array.isArray(arr) ? arr.map(normPerson) : [];
-    } catch { people = db().people.slice(); }
-  } else { people = db().people.slice(); }
+  let people = await listPeopleRaw(limit);
+  const blank = readCrmBlankState();
+  if (blank.peopleBlankGen >= CRM_PEOPLE_BLANK_GEN && blank.wipedAt) {
+    people = people.filter((p) => (p.createdAt ?? 0) > blank.wipedAt);
+  }
   if (opts.search) {
     const q = opts.search.toLowerCase();
     people = people.filter((p) => `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q));
@@ -371,7 +454,14 @@ export async function createPerson(input: { firstName: string; lastName: string;
     } catch { /* mock */ }
   }
   const store = db();
-  const person: Person = { id: rid("p"), firstName: input.firstName, lastName: input.lastName, email: input.email ?? null, companyId: input.companyId ?? null };
+  const person: Person = {
+    id: rid("p"),
+    firstName: input.firstName,
+    lastName: input.lastName,
+    email: input.email ?? null,
+    companyId: input.companyId ?? null,
+    createdAt: Date.now(),
+  };
   store.people.unshift(person);
   persist();
   return person;
@@ -385,7 +475,21 @@ function normCompany(c: Record<string, unknown>): Company {
 function normPerson(p: Record<string, unknown>): Person {
   const name = p.name as { firstName?: string; lastName?: string } | undefined;
   const emails = p.emails as { primaryEmail?: string } | undefined;
-  return { id: String(p.id ?? ""), firstName: name?.firstName ?? (p.firstName as string) ?? "", lastName: name?.lastName ?? (p.lastName as string) ?? "", email: emails?.primaryEmail ?? (p.email as string) ?? null, companyId: (p.companyId as string) ?? null };
+  const createdRaw = p.createdAt ?? p.created_at;
+  const createdAt =
+    typeof createdRaw === "number"
+      ? createdRaw
+      : typeof createdRaw === "string"
+        ? Date.parse(createdRaw) || undefined
+        : undefined;
+  return {
+    id: String(p.id ?? ""),
+    firstName: name?.firstName ?? (p.firstName as string) ?? "",
+    lastName: name?.lastName ?? (p.lastName as string) ?? "",
+    email: emails?.primaryEmail ?? (p.email as string) ?? null,
+    companyId: (p.companyId as string) ?? null,
+    createdAt,
+  };
 }
 
 export function normalizeStage(stage?: string): DealStage {
