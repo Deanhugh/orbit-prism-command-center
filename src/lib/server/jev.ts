@@ -54,7 +54,7 @@ export function parseNoul(answer: JevAnswer | undefined): number | null {
 }
 
 function referer(): string {
-  return process.env.ORBIT_PUBLIC_URL || "https://command-center-production-e72e.up.railway.app";
+  return process.env.ORBIT_PUBLIC_URL || "https://app.orbitprism.com";
 }
 
 export async function askJev(

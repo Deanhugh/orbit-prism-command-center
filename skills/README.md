@@ -9,7 +9,7 @@ skills/<slug>/SKILL.md
 This folder is the GitHub source of truth. After you push to `main` and Railway finishes deploying,
 every `skills/<name>/SKILL.md` here shows on **Settings → Skills** with a **GitHub** badge:
 
-https://command-center-production-e72e.up.railway.app/jarvis/settings?tab=skills
+https://app.orbitprism.com/jarvis/settings?tab=skills
 
 You can also drop a `SKILL.md` on that Settings page. Uploads apply immediately and persist on the
 host; they do not write back to this repo. Add the same file here if you want it versioned.
