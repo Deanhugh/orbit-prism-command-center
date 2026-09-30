@@ -143,6 +143,8 @@ export interface JarvisHub {
   notes: JarvisNote[];
   proposals: JarvisProposal[];
   extraEvents: JarvisEvent[];
+  extraTasks: JarvisTask[];
+  extraHabits: JarvisHabit[];
   goals: JarvisGoal[];
   reminders: JarvisReminder[];
   replies: JarvisReply[];
@@ -527,6 +529,8 @@ export function emptyHub(username: string): JarvisHub {
     notes: seedNotes(),
     proposals: seedProposals(),
     extraEvents: [],
+    extraTasks: [],
+    extraHabits: [],
     goals: seedGoals(),
     reminders: seedReminders(),
     replies: seedReplies(),

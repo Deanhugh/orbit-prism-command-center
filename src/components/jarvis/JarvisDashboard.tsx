@@ -62,12 +62,18 @@ export function JarvisDashboard({
   const greet = greetingWord(new Date(now));
   const progress = dayProgress(new Date(now));
 
-  const tasks = useMemo(() => mergeTasks(officeTasks), [officeTasks]);
+  const tasks = useMemo(
+    () => mergeTasks(officeTasks, hub?.extraTasks ?? []),
+    [officeTasks, hub?.extraTasks],
+  );
   const events = useMemo(
     () => [...seedEvents(), ...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
     [hub?.extraEvents],
   );
-  const habits = seedHabits();
+  const habits = useMemo(
+    () => [...seedHabits(), ...(hub?.extraHabits ?? [])],
+    [hub?.extraHabits],
+  );
   const done = new Set(hub?.habitsDone ?? []);
 
   const filtered = tasks.filter((t) => {
@@ -369,16 +375,25 @@ function prettyName(username: string) {
 
 function mergeTasks(
   office: { id: string; title: string; status: string; progress: number; updatedAt: number }[],
+  extras: JarvisTask[] = [],
 ): JarvisTask[] {
-  return office.slice(0, 12).map((t) => ({
+  const personal = extras.map((t) => ({ ...t, project: t.project || "Personal" }));
+  const desk = office.slice(0, 12).map((t) => ({
     id: t.id,
     title: t.title,
     project: "Office",
     due: t.updatedAt || Date.now(),
     progress: t.progress,
-    status: t.status === "done" ? "done" : t.status === "in_progress" ? "in_progress" : t.status === "waiting_approval" ? "waiting" : "todo",
+    status: (t.status === "done"
+      ? "done"
+      : t.status === "in_progress"
+        ? "in_progress"
+        : t.status === "waiting_approval"
+          ? "waiting"
+          : "todo") as JarvisTask["status"],
     priority: "normal" as const,
   }));
+  return [...personal, ...desk];
 }
 
 function groupByProject(tasks: JarvisTask[]): [string, JarvisTask[]][] {

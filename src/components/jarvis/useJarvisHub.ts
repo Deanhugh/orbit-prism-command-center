@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { emptyHub, type JarvisHub } from "@/lib/jarvis-data";
+import { HUB_CHANGED, notifyHubChanged } from "@/lib/jarvis-events";
 
 export function useJarvisHub(initial?: JarvisHub | null, username = "there") {
   const [hub, setHub] = useState<JarvisHub | null>(initial ?? emptyHub(username));
@@ -45,6 +46,21 @@ export function useJarvisHub(initial?: JarvisHub | null, username = "there") {
     return reload();
   }, [reload, initial]);
 
+  useEffect(() => {
+    function onChange(ev: Event) {
+      const next = (ev as CustomEvent<JarvisHub | null>).detail;
+      if (next && next.profile) {
+        setHub(next);
+        setError("");
+        setLoading(false);
+        return;
+      }
+      reload();
+    }
+    window.addEventListener(HUB_CHANGED, onChange);
+    return () => window.removeEventListener(HUB_CHANGED, onChange);
+  }, [reload]);
+
   const save = useCallback(async (patch: Partial<JarvisHub>) => {
     setHub((prev) => (prev ? { ...prev, ...patch } : prev));
     const res = await fetch("/api/jarvis/hub", {
@@ -59,6 +75,7 @@ export function useJarvisHub(initial?: JarvisHub | null, username = "there") {
     const next = (await res.json()) as JarvisHub;
     setHub(next);
     setError("");
+    notifyHubChanged(next);
     return next;
   }, []);
 

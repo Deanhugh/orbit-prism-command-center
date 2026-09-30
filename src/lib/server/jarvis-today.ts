@@ -4,13 +4,10 @@ import { dataDir, loadConfig } from "./config";
 import { readHub } from "./jarvis-hub";
 import { JARVIS } from "../office-data";
 import { shortId } from "../utils";
-import {
-  formatClockHM,
-  isSameDay,
-  seedHabits,
-  type JarvisHub,
-} from "../jarvis-data";
+import { seedHabits, type JarvisHub } from "../jarvis-data";
 import { composeBrief } from "./briefs";
+import { applyPersonalCommand, looksLikePersonalUpdate, type AppliedPersonalUpdate } from "./jarvis-commands";
+import { DEFAULT_TZ, formatClockInZone, isSameDayInZone } from "./zone";
 
 export interface TodayLine {
   id: string;
@@ -59,34 +56,40 @@ export function todayBriefingText(userId: string, username: string, now = Date.n
 
 function serializeBriefing(hub: JarvisHub, username: string, now: number): string {
   const owner = hub.profile.ownerName || username;
+  const tz = hub.profile.timezone || DEFAULT_TZ;
+  const clock = (ts: number) => formatClockInZone(ts, tz);
   const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const habits = seedHabits();
+  const habits = [...seedHabits(), ...(hub.extraHabits ?? [])];
   const done = new Set(hub.habitsDone ?? []);
-  const todayEvents = events.filter((e) => isSameDay(e.start, now));
+  const todayEvents = events.filter((e) => isSameDayInZone(e.start, now, tz));
   const laterEvents = events.filter((e) => e.start > now).slice(0, 5);
   const reminders = (hub.reminders ?? []).filter((r) => !r.done).slice(0, 6);
   const replies = (hub.replies ?? []).filter((r) => !r.done).slice(0, 6);
   const goals = (hub.goals ?? []).slice(0, 6);
   const projects = (hub.projects ?? []).filter((p) => p.status !== "done").slice(0, 6);
   const notes = (hub.notes ?? []).slice(0, 4);
+  const personalTasks = (hub.extraTasks ?? []).filter((t) => t.status !== "done").slice(0, 8);
   const habitLine = habits
     .map((h) => `${done.has(h.id) ? "[x]" : "[ ]"} ${h.title} (${h.block})`)
     .join("; ");
 
   const lines = [
     `Owner: ${owner}`,
-    `Clock: ${formatClockHM(now)}`,
-    `Timezone: ${hub.profile.timezone}`,
+    `Clock: ${clock(now)}`,
+    `Timezone: ${tz}`,
     `Tagline: ${hub.profile.tagline}`,
     `Office board: see CURRENT OFFICE TASKS below or none yet`,
+    personalTasks.length
+      ? `Personal tasks: ${personalTasks.map((t) => `${t.title} (${clock(t.due)})`).join("; ")}`
+      : "Personal tasks: none",
     todayEvents.length
-      ? `Today's calendar: ${todayEvents.map((e) => `${formatClockHM(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`).join("; ")}`
+      ? `Today's calendar: ${todayEvents.map((e) => `${clock(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`).join("; ")}`
       : "Today's calendar: clear",
     laterEvents.length
-      ? `Next up: ${laterEvents.map((e) => `${formatClockHM(e.start)} ${e.title}`).join("; ")}`
+      ? `Next up: ${laterEvents.map((e) => `${clock(e.start)} ${e.title}`).join("; ")}`
       : "",
     reminders.length
-      ? `Reminders: ${reminders.map((r) => `${r.title} (${formatClockHM(r.when)})`).join("; ")}`
+      ? `Reminders: ${reminders.map((r) => `${r.title} (${clock(r.when)})`).join("; ")}`
       : "Reminders: none open",
     replies.length
       ? `People waiting on a reply: ${replies.map((r) => `${r.name} — ${r.note} (${r.daysWaiting}d)`).join("; ")}`
@@ -109,7 +112,8 @@ export function todayFallbackReply(userId: string, username: string, text: strin
   const owner = hub.profile.ownerName || "there";
   const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
   const now = Date.now();
-  const todayEvents = events.filter((e) => isSameDay(e.start, now));
+  const tz = hub.profile.timezone || DEFAULT_TZ;
+  const todayEvents = events.filter((e) => isSameDayInZone(e.start, now, tz));
   const next = todayEvents[0] || events.find((e) => e.start > now);
   const reminders = (hub.reminders ?? []).filter((r) => !r.done);
   const replies = (hub.replies ?? []).filter((r) => !r.done);
@@ -127,7 +131,7 @@ export function todayFallbackReply(userId: string, username: string, text: strin
     const bits = [
       `Good ${nowHourWord()}, ${owner}.`,
       replies[0] ? `${replies[0].name} is still waiting on you.` : "No one is waiting on a reply.",
-      next ? `Next block: ${formatClockHM(next.start)} ${next.title}.` : "Calendar is quiet after this.",
+      next ? `Next block: ${formatClockInZone(next.start, tz)} ${next.title}.` : "Calendar is quiet after this.",
       reminders[0] ? `Reminder: ${reminders[0].title}.` : "",
       "Ask Settings → Routines to put Morning Brief and Evening Wrap on a clock.",
     ];
@@ -139,6 +143,7 @@ export function todayFallbackReply(userId: string, username: string, text: strin
 /** True when the owner is asking Jarvis to put a desk to work (not a brief / greeting). */
 export function looksLikeOfficeTask(text: string, kind?: string): boolean {
   if (kind === "brief") return false;
+  if (looksLikePersonalUpdate(text, kind)) return false;
   const t = text.toLowerCase().trim();
   if (!t) return false;
   if (/^(hi|hello|hey|thanks|thank you|ok|okay|good (morning|afternoon|evening))[\s!.]*$/i.test(t)) {
@@ -179,7 +184,8 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
   return [
     `You are ${JARVIS.name}, the ${JARVIS.role} of ${cfg.name}. ${JARVIS.does}`,
     `You are speaking in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
-    `You take typed and spoken instructions. When the owner asks for work, the office already dispatches it to the right desk — confirm the assignment in short spoken-friendly sentences.`,
+    `You take typed and spoken instructions. Personal calendar, tasks, habits, goals, and reminders are already written onto the Command Center hub when the owner asks — confirm those in short spoken-friendly sentences.`,
+    `When the owner asks for desk work (CAD, Studio, CRM, PMO, Finance, a post, scrape), the office already dispatches it — confirm the assignment.`,
     `You do not control the desktop, run Python, open apps, send system commands, or use Mark-LIV. If asked for those powers, say they are not on this panel.`,
     `Do not invent calendar items, people, or tasks that are not in the snapshot or this conversation.`,
     briefLine,
@@ -200,7 +206,17 @@ export function resolveTodayPrompt(preset: string, text: string): { text: string
   return { text: text.trim(), kind: "chat" };
 }
 
-export async function answerTodayChat(userId: string, username: string, text: string, kind: string): Promise<string> {
+export async function answerTodayChat(
+  userId: string,
+  username: string,
+  text: string,
+  kind: string,
+): Promise<{ reply: string; applied: AppliedPersonalUpdate | null }> {
+  if (kind !== "brief") {
+    const applied = await applyPersonalCommand(userId, username, text);
+    if (applied) return { reply: applied.reply, applied };
+  }
+
   if (kind === "brief" || /^(morning brief|evening wrap)\.?$/i.test(text.trim())) {
     const briefKind = /evening|wrap/i.test(text) ? "evening" : "morning";
     const { ensureStarted, listOfficeTasks, emitBrief } = await import("./runtime");
@@ -211,13 +227,13 @@ export async function answerTodayChat(userId: string, username: string, text: st
       source: "on-demand",
     });
     emitBrief(brief);
-    return brief.narrative;
+    return { reply: brief.narrative, applied: null };
   }
 
   if (looksLikeOfficeTask(text, kind)) {
     const { jarvisRoute } = await import("./runtime");
     const routed = await jarvisRoute(text);
-    return routed.reply;
+    return { reply: routed.reply, applied: null };
   }
 
   const { loadAgentsConfig } = await import("./providers");
@@ -229,7 +245,7 @@ export async function answerTodayChat(userId: string, username: string, text: st
       setTimeout(() => resolve({ ok: false, reason: "timeout" }), 700),
     ),
   ]);
-  if (!status.ok) return todayFallbackReply(userId, username, text, kind);
+  if (!status.ok) return { reply: todayFallbackReply(userId, username, text, kind), applied: null };
 
   let mcpBlock = "";
   if (/\b(notion|wiki|workspace page|knowledge base|apify|scrape|instagram|tiktok|facebook|linkedin|serp|google search|krea|generate (an |a )?(image|video)|text[- ]to[- ]image|website|https?:\/\/)\b/i.test(text)) {
@@ -267,5 +283,5 @@ export async function answerTodayChat(userId: string, username: string, text: st
     if (ev.type === "token") content += ev.text;
     if (ev.type === "done") content = ev.content || content;
   }
-  return content || todayFallbackReply(userId, username, text, kind);
+  return { reply: content || todayFallbackReply(userId, username, text, kind), applied: null };
 }

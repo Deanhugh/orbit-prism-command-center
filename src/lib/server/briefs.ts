@@ -6,14 +6,16 @@ import { shortId } from "../utils";
 import { completePrompt } from "./llm";
 import { loadAgentsConfig } from "./providers";
 import { writeDeliverable } from "./brain";
-import { dateKeyInZone, DEFAULT_TZ } from "./zone";
-import type { BriefKind, StoredBrief, Task } from "../types";
 import {
-  formatClockHM,
-  isSameDay,
-  startOfDay,
-  type JarvisHub,
-} from "../jarvis-data";
+  DEFAULT_TZ,
+  addDaysInZone,
+  dateKeyInZone,
+  formatClockInZone,
+  isSameDayInZone,
+  startOfDayInZone,
+} from "./zone";
+import type { BriefKind, StoredBrief, Task } from "../types";
+import { seedGoals, seedHabits, type JarvisHub } from "../jarvis-data";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -85,21 +87,40 @@ export interface BriefFacts {
   tomorrow: string[];
   doneToday: string[];
   calendar: string[];
+  habits: string[];
+  goals: string[];
 }
 
-export function collectBriefFacts(tasks: Task[], now = Date.now()): BriefFacts {
-  const { hub, timezone, username } = ownerContext();
+export function collectBriefFacts(
+  tasks: Task[],
+  now = Date.now(),
+  ctx: { hub: JarvisHub; timezone: string; username: string } = ownerContext(),
+): BriefFacts {
+  const { hub, timezone, username } = ctx;
   const owner = hub.profile.ownerName || username;
   const date = dateKeyInZone(timezone, now);
+  const clock = (ts: number) => formatClockInZone(ts, timezone);
+  const tomorrowMs = addDaysInZone(timezone, now, 1);
   const open = tasks.filter((t) => t.status !== "done" && t.status !== "rejected" && t.status !== "stopped");
-  const dueToday = open
-    .filter((t) => isSameDay(t.createdAt, now) || isSameDay(t.updatedAt, now))
-    .slice(0, 8)
-    .map((t) => `${t.title} (${t.agentName} · ${statusLabel(t.status)})`);
-  const overdue = open
-    .filter((t) => t.createdAt < startOfDay(now) - 86400000 && t.status !== "in_progress")
-    .slice(0, 6)
-    .map((t) => `${t.title} (${t.agentName})`);
+  const personalDue = (hub.extraTasks ?? []).filter((t) => t.status !== "done");
+  const dueToday = [
+    ...personalDue
+      .filter((t) => isSameDayInZone(t.due, now, timezone))
+      .map((t) => `${t.title} (${clock(t.due)})`),
+    ...open
+      .filter((t) => isSameDayInZone(t.createdAt, now, timezone) || isSameDayInZone(t.updatedAt, now, timezone))
+      .slice(0, 8)
+      .map((t) => `${t.title} (${t.agentName} · ${statusLabel(t.status)})`),
+  ].slice(0, 10);
+  const overdue = [
+    ...personalDue
+      .filter((t) => t.due < startOfDayInZone(timezone, now))
+      .map((t) => t.title),
+    ...open
+      .filter((t) => t.createdAt < startOfDayInZone(timezone, now) - 86400000 && t.status !== "in_progress")
+      .slice(0, 6)
+      .map((t) => `${t.title} (${t.agentName})`),
+  ].slice(0, 8);
   const inMotion = open
     .filter((t) => t.status === "in_progress")
     .slice(0, 8)
@@ -110,19 +131,30 @@ export function collectBriefFacts(tasks: Task[], now = Date.now()): BriefFacts {
   ].slice(0, 8);
   const waitingOnThem = [
     ...open.filter((t) => /\b(chase|nudge|waiting on|follow.?up|overdue)\b/i.test(t.title)).map((t) => t.title),
-    ...(hub.reminders ?? []).filter((r) => !r.done).map((r) => r.title),
+    ...(hub.reminders ?? []).filter((r) => !r.done).map((r) => `${r.title} (${clock(r.when)})`),
   ].slice(0, 8);
-  const tomorrow = (hub.extraEvents ?? [])
-    .filter((e) => isSameDay(e.start, now + 86400000))
-    .map((e) => `${formatClockHM(e.start)} ${e.title}`);
+  const tomorrow = [
+    ...(hub.extraEvents ?? [])
+      .filter((e) => isSameDayInZone(e.start, tomorrowMs, timezone))
+      .map((e) => `${clock(e.start)} ${e.title}`),
+    ...personalDue
+      .filter((t) => isSameDayInZone(t.due, tomorrowMs, timezone))
+      .map((t) => `${t.title} (${clock(t.due)})`),
+  ];
   const doneToday = tasks
-    .filter((t) => t.status === "done" && isSameDay(t.updatedAt, now))
+    .filter((t) => t.status === "done" && isSameDayInZone(t.updatedAt, now, timezone))
     .slice(0, 8)
     .map((t) => `${t.title} (${t.agentName})`);
   const calendar = (hub.extraEvents ?? [])
-    .filter((e) => isSameDay(e.start, now))
+    .filter((e) => isSameDayInZone(e.start, now, timezone))
     .sort((a, b) => a.start - b.start)
-    .map((e) => `${formatClockHM(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`);
+    .map((e) => `${clock(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`);
+  const extraHabits = hub.extraHabits ?? [];
+  const habits = [...seedHabits(), ...extraHabits].map((h) => {
+    const marked = (hub.habitsDone ?? []).includes(h.id);
+    return `${marked ? "[x]" : "[ ]"} ${h.title} (${h.block})`;
+  });
+  const goals = (hub.goals ?? []).slice(0, 6).map((g) => `${g.title} (${g.progress}%, ${g.category})`);
 
   return {
     owner,
@@ -136,7 +168,31 @@ export function collectBriefFacts(tasks: Task[], now = Date.now()): BriefFacts {
     tomorrow,
     doneToday,
     calendar,
+    habits,
+    goals,
   };
+}
+
+function personalHabitLines(facts: BriefFacts): string[] {
+  const seeds = new Set(seedHabits().map((h) => h.title.toLowerCase()));
+  return facts.habits
+    .filter((line) => {
+      const title = line.replace(/^\[[ x]\]\s+/i, "").replace(/\s+\([^)]+\)\s*$/, "");
+      return title && !seeds.has(title.toLowerCase());
+    })
+    .slice(0, 4)
+    .map((l) => `Habit: ${l}`);
+}
+
+function personalGoalLines(facts: BriefFacts): string[] {
+  const seeds = new Set(seedGoals().map((g) => g.title.toLowerCase()));
+  return facts.goals
+    .filter((line) => {
+      const title = line.replace(/\s+\([^)]+\)\s*$/, "");
+      return title && !seeds.has(title.toLowerCase());
+    })
+    .slice(0, 4)
+    .map((l) => `Goal: ${l}`);
 }
 
 function factsToSections(kind: BriefKind, facts: BriefFacts): StoredBrief["sections"] {
@@ -144,6 +200,8 @@ function factsToSections(kind: BriefKind, facts: BriefFacts): StoredBrief["secti
     ...facts.overdue.map((l) => `Slipped: ${l}`),
     ...facts.dueToday,
     ...facts.calendar.map((l) => `Calendar: ${l}`),
+    ...personalHabitLines(facts),
+    ...personalGoalLines(facts),
   ].filter(Boolean);
   return {
     today: today.length ? today : ["Board is clear."],
@@ -184,7 +242,51 @@ function snapshotText(facts: BriefFacts): string {
     facts.doneToday.length ? `Done today: ${facts.doneToday.join("; ")}` : "Done today: none",
     facts.calendar.length ? `Calendar today: ${facts.calendar.join("; ")}` : "Calendar today: clear",
     facts.tomorrow.length ? `Tomorrow: ${facts.tomorrow.join("; ")}` : "Tomorrow: clear",
-  ].join("\n");
+    facts.habits.length ? `Habits: ${facts.habits.join("; ")}` : "",
+    facts.goals.length ? `Goals: ${facts.goals.join("; ")}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+/** Rewrite today's stored briefs from the live hub so voice updates appear immediately. */
+export function refreshTodayBriefs(
+  tasks: Task[],
+  now = Date.now(),
+  ctx?: { hub: JarvisHub; timezone: string; username: string },
+): StoredBrief[] {
+  const facts = collectBriefFacts(tasks, now, ctx ?? ownerContext());
+  const out: StoredBrief[] = [];
+  for (const kind of ["morning", "evening"] as const) {
+    const existing = latestBrief(kind, facts.date);
+    const sections = factsToSections(kind, facts);
+    const added = [
+      ...facts.calendar,
+      ...facts.dueToday,
+      ...personalHabitLines(facts),
+      ...personalGoalLines(facts),
+    ].filter(Boolean);
+    let narrative = existing?.narrative || narrativeFrom(kind, facts);
+    const missing = added.filter((line) => !narrative.toLowerCase().includes(line.toLowerCase().slice(0, 24)));
+    if (missing[0] && existing) {
+      narrative = `${narrative.replace(/\s+$/, "")} Latest: ${missing[0]}.`;
+    }
+    const greet = kind === "evening" ? "Good evening" : "Good morning";
+    out.push(
+      upsertBrief({
+        id: existing?.id || shortId("b"),
+        kind,
+        date: facts.date,
+        createdAt: existing?.createdAt ?? now,
+        timezone: facts.timezone,
+        owner: facts.owner,
+        greeting: existing?.greeting || `${greet}, ${facts.owner}.`,
+        narrative,
+        sections,
+        notePath: existing?.notePath,
+        source: existing?.source || "on-demand",
+      }),
+    );
+  }
+  return out;
 }
 
 function parseModelBrief(raw: string, fallback: StoredBrief["sections"]): StoredBrief["sections"] {
