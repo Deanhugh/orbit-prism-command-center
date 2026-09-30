@@ -21,7 +21,7 @@ export function saveArtifact(input: {
   videoUrl?: string;
 }): ArtifactMeta {
   fs.mkdirSync(dir(), { recursive: true });
-  const markdown = input.markdown.trim() || "Empty deliverable.";
+  const markdown = (input.markdown.trim() || "Empty deliverable.") + "\n";
   const id = shortId("art");
   const meta: ArtifactMeta = {
     id,
@@ -177,7 +177,7 @@ function slidesHtml(meta: ArtifactMeta): string {
 }
 
 export function artifactCsv(meta: ArtifactMeta): string {
-  const tables = [...meta.markdown.matchAll(/((?:^\|.+\|\n)+)/gm)];
+  const tables = [...meta.markdown.replace(/\r\n/g, "\n").matchAll(/((?:^\|.+\|\n)+)/gm)];
   if (tables.length) {
     const rows: string[] = [];
     for (const t of tables) {
