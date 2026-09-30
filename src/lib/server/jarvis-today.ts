@@ -59,7 +59,7 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
   const tz = hub.profile.timezone || DEFAULT_TZ;
   const clock = (ts: number) => formatClockInZone(ts, tz);
   const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const habits = [...seedHabits(), ...(hub.extraHabits ?? [])];
+  const habits = [...(hub.suppressSeeds?.habits ? [] : seedHabits()), ...(hub.extraHabits ?? [])];
   const done = new Set(hub.habitsDone ?? []);
   const todayEvents = events.filter((e) => isSameDayInZone(e.start, now, tz));
   const laterEvents = events.filter((e) => e.start > now).slice(0, 5);

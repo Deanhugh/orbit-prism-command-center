@@ -23,6 +23,7 @@ import {
 export type PersonalSurface = "calendar" | "task" | "habit" | "goal" | "reminder";
 
 export interface ParsedPersonalCommand {
+  action: "add" | "clear";
   surfaces: PersonalSurface[];
   title: string;
   when: number;
@@ -33,10 +34,12 @@ export interface ParsedPersonalCommand {
 }
 
 export interface AppliedPersonalUpdate {
+  action: "add" | "clear";
   surfaces: PersonalSurface[];
   title: string;
   when: number;
   reply: string;
+  cleared?: number;
   event?: JarvisEvent;
   task?: JarvisTask;
   habit?: JarvisHabit;
@@ -95,6 +98,24 @@ const SURFACE_RE =
   /\b(calendar|calander|calender|agenda|to-?dos?|tasks?|habits?|goals?|reminders?)\b|\bremind me\b|\bon my (day|plate|calendar|calander|calender)\b/i;
 const ACTION_RE =
   /\b(add|put|set|create|update|log|track|schedule|book|move|remember|remind|pencil|write)\b/i;
+const CLEAR_RE =
+  /\b(clear|cleared|delete|remove|wipe|empty|reset|drop)\b|\bget rid of\b|\bno more\b|\btake (them|it|all) off\b/i;
+const ALL_SECTIONS_RE =
+  /\b(everything|every section|all (of )?(it|them|sections)|the (whole )?(board|deck|dashboard|hub))\b/i;
+const GENERIC_TITLES = new Set([
+  "personal item",
+  "all",
+  "section",
+  "item",
+  "items",
+  "ones",
+  "one",
+  "everything",
+  "dashboard",
+  "board",
+  "deck",
+  "hub",
+]);
 const DATE_RE =
   /\b(today|tonight|tomorrow|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat|sunday|sun|next week|this week)\b/i;
 const APPOINTMENT_RE =
@@ -108,17 +129,23 @@ export function looksLikePersonalUpdate(text: string, kind?: string): boolean {
   if (kind === "brief") return false;
   const t = text.toLowerCase().trim();
   if (!t) return false;
-  if (INQUIRY_RE.test(t) && !ACTION_RE.test(t)) return false;
-  if (OFFICE_DESK_RE.test(t) && !SURFACE_RE.test(t)) return false;
+  if (INQUIRY_RE.test(t) && !ACTION_RE.test(t) && !CLEAR_RE.test(t)) return false;
+  if (OFFICE_DESK_RE.test(t) && !SURFACE_RE.test(t) && !CLEAR_RE.test(t)) return false;
   const hasSurface = SURFACE_RE.test(t);
   const hasAction = ACTION_RE.test(t);
+  const hasClear = CLEAR_RE.test(t);
   const hasDate = DATE_RE.test(t) || hasMonthDay(t) || /\bon the \d{1,2}(st|nd|rd|th)?\b/.test(t);
   const hasAppointment = APPOINTMENT_RE.test(t);
+  if (hasClear && (hasSurface || ALL_SECTIONS_RE.test(t))) return true;
   if (hasSurface && hasAction) return true;
   if (hasSurface && hasDate) return true;
   if (hasAppointment && (hasAction || hasDate)) return true;
   if (hasDate && hasAction && /\b(task|meeting|call|block|event|reminder)\b/i.test(t)) return true;
   return false;
+}
+
+export function isClearIntent(text: string): boolean {
+  return CLEAR_RE.test(text);
 }
 
 export function parsePersonalCommand(
@@ -128,7 +155,9 @@ export function parsePersonalCommand(
 ): ParsedPersonalCommand | null {
   if (!looksLikePersonalUpdate(text)) return null;
   const tz = timeZone || DEFAULT_TZ;
-  const surfaces = inferSurfaces(text);
+  const action: ParsedPersonalCommand["action"] = isClearIntent(text) ? "clear" : "add";
+  const surfaces = inferSurfaces(text, action);
+  if (action === "clear" && surfaces.length === 0) return null;
   const time = parseTimeOfDay(text);
   const day = parseDay(text, tz, now);
   const hour = time?.hour ?? defaultHour(text, surfaces);
@@ -139,6 +168,7 @@ export function parsePersonalCommand(
   const end = zonedWallToUtc(tz, endParts.year, endParts.month, endParts.day, endParts.hour, endParts.minute);
   const title = extractTitle(text);
   return {
+    action,
     surfaces,
     title,
     when: start,
@@ -160,8 +190,13 @@ export async function applyPersonalCommand(
   const parsed = parsePersonalCommand(text, tz, now);
   if (!parsed) return null;
 
+  if (parsed.action === "clear") {
+    return applyClearCommand(userId, username, hub, parsed, now);
+  }
+
   const patch: Partial<JarvisHub> = {};
   const applied: AppliedPersonalUpdate = {
+    action: "add",
     surfaces: parsed.surfaces,
     title: parsed.title,
     when: parsed.when,
@@ -278,8 +313,115 @@ export async function applyPersonalCommand(
   return applied;
 }
 
-function inferSurfaces(text: string): PersonalSurface[] {
+async function applyClearCommand(
+  userId: string,
+  username: string,
+  hub: JarvisHub,
+  parsed: ParsedPersonalCommand,
+  now: number,
+): Promise<AppliedPersonalUpdate> {
+  const tz = hub.profile.timezone || DEFAULT_TZ;
+  const specific = isSpecificTitle(parsed.title);
+  const patch: Partial<JarvisHub> = {};
+  let cleared = 0;
+
+  for (const surface of parsed.surfaces) {
+    if (surface === "calendar") {
+      const list = hub.extraEvents ?? [];
+      const next = specific ? list.filter((e) => !titleMatch(e.title, parsed.title)) : [];
+      cleared += list.length - next.length;
+      patch.extraEvents = next;
+      if (!specific) {
+        if (!hub.suppressSeeds?.calendar) cleared += 1;
+        patch.suppressSeeds = { ...hub.suppressSeeds, ...patch.suppressSeeds, calendar: true };
+      }
+    }
+    if (surface === "task") {
+      const list = hub.extraTasks ?? [];
+      const next = specific ? list.filter((t) => !titleMatch(t.title, parsed.title)) : [];
+      cleared += list.length - next.length;
+      patch.extraTasks = next;
+    }
+    if (surface === "habit") {
+      const list = hub.extraHabits ?? [];
+      const next = specific ? list.filter((h) => !titleMatch(h.title, parsed.title)) : [];
+      const removed = list.filter((h) => !next.some((n) => n.id === h.id));
+      cleared += removed.length;
+      patch.extraHabits = next;
+      patch.habitsDone = specific
+        ? (hub.habitsDone ?? []).filter((id) => !removed.some((h) => h.id === id))
+        : [];
+      if (!specific) {
+        if (!hub.suppressSeeds?.habits) cleared += 1;
+        patch.suppressSeeds = { ...hub.suppressSeeds, ...patch.suppressSeeds, habits: true };
+      }
+    }
+    if (surface === "goal") {
+      const list = hub.goals ?? [];
+      const next = specific ? list.filter((g) => !titleMatch(g.title, parsed.title)) : [];
+      cleared += list.length - next.length;
+      patch.goals = next;
+    }
+    if (surface === "reminder") {
+      const list = hub.reminders ?? [];
+      const next = specific ? list.filter((r) => !titleMatch(r.title, parsed.title)) : [];
+      cleared += list.length - next.length;
+      patch.reminders = next;
+    }
+  }
+
+  const saved = Object.keys(patch).length ? patchHub(userId, username, patch) : hub;
+  const labels: Record<PersonalSurface, string> = {
+    calendar: "Calendar",
+    task: "Tasks",
+    habit: "Habits",
+    goal: "Goals",
+    reminder: "Reminders",
+  };
+  const places = parsed.surfaces.map((s) => labels[s]).join(" and ");
+  let reply: string;
+  if (specific && cleared === 0) {
+    reply = `I did not find ${parsed.title} on ${places}.`;
+  } else if (specific) {
+    reply = `Removed ${parsed.title} from ${places}.`;
+  } else if (cleared === 0) {
+    reply = `${places} ${parsed.surfaces.length === 1 ? "is" : "are"} already clear.`;
+  } else {
+    reply = `Cleared ${places}. That section is empty on the dashboard and will drop off Morning Brief and Evening Wrap.`;
+  }
+
+  try {
+    const { emitBrief, listOfficeTasks } = await import("./runtime");
+    const briefs = refreshTodayBriefs(
+      listOfficeTasks(),
+      now,
+      {
+        hub: saved,
+        username,
+        timezone: saved.profile.timezone || DEFAULT_TZ,
+      },
+      specific ? [`Removed ${parsed.title}`] : [`Cleared ${places}`],
+    );
+    for (const brief of briefs) emitBrief(brief);
+  } catch {
+    /* office runtime may be cold; hub write still stands */
+  }
+
+  return {
+    action: "clear",
+    surfaces: parsed.surfaces,
+    title: parsed.title,
+    when: parsed.when,
+    reply,
+    cleared,
+  };
+}
+
+function inferSurfaces(text: string, action: "add" | "clear" = "add"): PersonalSurface[] {
   const t = text.toLowerCase();
+  if (action === "clear" && ALL_SECTIONS_RE.test(t)) {
+    return ["calendar", "task", "habit", "goal", "reminder"];
+  }
   const out = new Set<PersonalSurface>();
   if (/\b(calendar|calander|calender|agenda)\b/.test(t) || /\bon my (day|calendar|calander|calender)\b/.test(t)) {
     out.add("calendar");
@@ -289,6 +431,7 @@ function inferSurfaces(text: string): PersonalSurface[] {
   if (/\bgoals?\b/.test(t)) out.add("goal");
   if (/\bremind(er|ers| me)\b/.test(t)) out.add("reminder");
   if (
+    action === "add" &&
     /\b(appointment|meeting|block|event)\b/.test(t) &&
     !out.has("habit") &&
     !out.has("goal") &&
@@ -296,14 +439,14 @@ function inferSurfaces(text: string): PersonalSurface[] {
   ) {
     out.add("calendar");
   }
-  if (out.size === 0) {
+  if (out.size === 0 && action === "add") {
     out.add("calendar");
     out.add("task");
   }
-  if (out.has("calendar") && /\b(task|to-?do)\b/.test(t)) out.add("task");
+  if (action === "add" && out.has("calendar") && /\b(task|to-?do)\b/.test(t)) out.add("task");
   const dated =
     DATE_RE.test(t) || hasMonthDay(t) || /\bon the \d{1,2}(st|nd|rd|th)?\b/.test(t);
-  if (out.has("task") && dated && !out.has("habit") && !out.has("goal")) out.add("calendar");
+  if (action === "add" && out.has("task") && dated && !out.has("habit") && !out.has("goal")) out.add("calendar");
   return [...out];
 }
 
@@ -434,6 +577,10 @@ function addMinutes(
 function extractTitle(text: string): string {
   let t = text.trim();
   t = t.replace(/^(please |can you |could you |would you |jarvis[, ]+|hey jarvis[, ]+)/i, "");
+  t = t.replace(/\b(clear|cleared|delete|remove|wipe|empty|reset|drop|get rid of)\b/gi, " ");
+  t = t.replace(/\b(all of|all my|all the|all|everything|every section)\b/gi, " ");
+  t = t.replace(/\b(the )?(whole )?(board|deck|dashboard|hub)\b/gi, " ");
+  t = t.replace(/\bfrom\b/gi, " ");
   t = t.replace(/\b(add|put|set|create|update|log|track|schedule|book|move|remember|remind me to|remind me|pencil|write)\b/gi, " ");
   t = t.replace(/\b(calendar|calander|calender|agenda|tasks?|to-?dos?|habits?|goals?|reminders?)\b/gi, " ");
   t = t.replace(/\b(with a|onto|into|on my|to my|for me|on the)\b/gi, " ");
@@ -478,6 +625,18 @@ function hasMonthDay(t: string): boolean {
 
 function normalizeTitle(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function isSpecificTitle(title: string): boolean {
+  const n = normalizeTitle(title);
+  return Boolean(n) && !GENERIC_TITLES.has(n);
+}
+
+function titleMatch(stored: string, asked: string): boolean {
+  const a = normalizeTitle(stored);
+  const b = normalizeTitle(asked);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
 }
 
 function alreadyHasEvent(events: JarvisEvent[], event: JarvisEvent, tz: string): boolean {

@@ -33,6 +33,10 @@ export function readHub(userId: string, username: string): JarvisHub {
         statuses: Array.isArray(raw.crm?.statuses) ? raw.crm.statuses : fallback.crm.statuses,
       },
       greetings: Array.isArray(raw.greetings) ? raw.greetings : fallback.greetings,
+      suppressSeeds: {
+        calendar: raw.suppressSeeds?.calendar ?? fallback.suppressSeeds.calendar,
+        habits: raw.suppressSeeds?.habits ?? fallback.suppressSeeds.habits,
+      },
     };
   } catch {
     writeHub(userId, fallback);
@@ -66,6 +70,10 @@ export function patchHub(userId: string, username: string, patch: Partial<Jarvis
       : current.appearance,
     crm: patch.crm ?? current.crm,
     greetings: patch.greetings ?? current.greetings,
+    suppressSeeds: {
+      calendar: patch.suppressSeeds?.calendar ?? current.suppressSeeds?.calendar,
+      habits: patch.suppressSeeds?.habits ?? current.suppressSeeds?.habits,
+    },
   };
   return writeHub(userId, next);
 }
