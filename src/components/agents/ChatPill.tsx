@@ -203,7 +203,6 @@ export function ChatPill({
           {stats.usage?.estimated ? " est." : ""}
         </span>
         <span>Cache hit {cachePct}%</span>
-        <span className="ml-auto uppercase tracking-wide">{MODE_LABEL[mode]}</span>
       </div>
     </div>
   );
