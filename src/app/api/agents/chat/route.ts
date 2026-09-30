@@ -1,10 +1,11 @@
 import { NextRequest } from "next/server";
-import { conversationById, getMessages, appendMessage, resolveResponder } from "@/lib/server/conversations";
+import { conversationById, getMessages, appendMessage, resolveResponder, clearConversation } from "@/lib/server/conversations";
 import { prepareChat } from "@/lib/server/agent-chat";
 import { chatStream } from "@/lib/server/llm";
 import { executeTool } from "@/lib/server/composio";
 import { loadAgentsConfig, type ProviderId } from "@/lib/server/providers";
 import type { ChatToolStep } from "@/lib/agents-types";
+import { looksLikeClearChat } from "@/lib/clear-chat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,29 @@ export async function POST(req: NextRequest) {
   const cfg = loadAgentsConfig();
   const provider = (body.provider as ProviderId) || cfg.provider;
   const model = (body.model as string) || cfg.model || "demo";
+
+  if (looksLikeClearChat(text)) {
+    clearConversation(convId);
+    const encoder = new TextEncoder();
+    const agentName = conv.title;
+    const stream = new ReadableStream({
+      start(controller) {
+        const send = (obj: unknown) => {
+          try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`)); } catch { /* closed */ }
+        };
+        send({ type: "start", agentId: conv.agentIds[0], agentName });
+        send({ type: "cleared", messages: [] });
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  }
 
   // record the user's message
   appendMessage(convId, { role: "user", content: text });
