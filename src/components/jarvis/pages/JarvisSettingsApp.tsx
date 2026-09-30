@@ -9,6 +9,7 @@ import {
   Handshake,
   KeyRound,
   MessageCircle,
+  AudioLines,
   Palette,
   Plug,
   Save,
@@ -22,6 +23,7 @@ import { SETTINGS_TABS, settingsHref, type SettingsTab } from "@/lib/jarvis-sett
 import { AccountPanel, AppearancePanel, CrmPanel, GreetingsPanel } from "./SettingsPanels";
 import { Connectors, Providers, Skills } from "@/components/settings/SettingsPage";
 import { Routines } from "@/components/settings/settings-routines";
+import { VoiceSettings } from "@/components/settings/settings-voice";
 import { defaultAppearance } from "@/lib/jarvis-appearance";
 import { defaultCrmTaxonomy, defaultGreetings } from "@/lib/jarvis-data";
 
@@ -30,6 +32,7 @@ const TAB_ICON: Record<SettingsTab, typeof Settings2> = {
   Appearance: Palette,
   Account: UserRound,
   Providers: KeyRound,
+  Voice: AudioLines,
   MCP: Plug,
   Skills: BookOpen,
   Routines: AlarmClock,
@@ -159,6 +162,7 @@ export function JarvisSettingsApp({
             <Providers />
           </div>
         ) : null}
+        {tab === "Voice" ? <VoiceSettings /> : null}
         {tab === "MCP" ? (
           <div className="mx-auto max-w-[900px]">
             <Connectors />

@@ -252,6 +252,8 @@ export function Providers() {
             On Railway pick <strong>OpenRouter</strong> — one key, every major model (Claude, GPT, Gemini, Llama, Grok).
             Ollama Cloud is the fallback if you only want Ollama&apos;s catalog. Local Ollama at <code>127.0.0.1:11434</code> only works on the Mac.
             When the selected provider is reachable, the office badge turns <strong>Live</strong> and Demo stays off.
+            Jarvis&apos;s spoken voice is separate — pick a Fish Audio library voice under{" "}
+            <a className="underline" href="/jarvis/settings?tab=voice">Settings → Voice</a>.
           </p>
         )}
       </section>
