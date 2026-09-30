@@ -101,3 +101,59 @@ export function useVoice(onFinal: (text: string) => void) {
 
   return { supported, listening, interim, start, stop, speak };
 }
+
+function isEditableTarget(el: EventTarget | null): el is HTMLInputElement | HTMLTextAreaElement {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  if (tag === "TEXTAREA") return true;
+  if (tag === "SELECT") return true;
+  if (tag === "INPUT") {
+    const type = (el as HTMLInputElement).type;
+    return !["button", "submit", "reset", "checkbox", "radio", "file", "range", "color", "hidden"].includes(type);
+  }
+  return el.isContentEditable || Boolean(el.closest("[contenteditable='true']"));
+}
+
+function editableHasText(el: EventTarget | null): boolean {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return Boolean(el.value.trim());
+  }
+  if (el instanceof HTMLElement && el.isContentEditable) {
+    return Boolean(el.textContent?.trim());
+  }
+  return false;
+}
+
+/** Space starts or stops the mic, unless the user is typing a space in a filled field. */
+export function useSpaceToTalk(opts: {
+  enabled: boolean;
+  listening: boolean;
+  start: () => void;
+  stop: () => void;
+}) {
+  const startRef = useRef(opts.start);
+  const stopRef = useRef(opts.stop);
+  const listeningRef = useRef(opts.listening);
+  const enabledRef = useRef(opts.enabled);
+
+  useEffect(() => {
+    startRef.current = opts.start;
+    stopRef.current = opts.stop;
+    listeningRef.current = opts.listening;
+    enabledRef.current = opts.enabled;
+  }, [opts.start, opts.stop, opts.listening, opts.enabled]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!enabledRef.current) return;
+      if (e.code !== "Space" && e.key !== " ") return;
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isEditableTarget(e.target) && editableHasText(e.target) && !listeningRef.current) return;
+      e.preventDefault();
+      if (listeningRef.current) stopRef.current();
+      else startRef.current();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
+}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUp, Mic, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useVoice } from "@/lib/use-voice";
+import { useSpaceToTalk, useVoice } from "@/lib/use-voice";
 import { jarvisSpeechSupported, primeJarvisSpeech, speakJarvis, stopJarvisSpeech } from "@/lib/speak-jarvis";
 import { JarvisCore, type JarvisMood } from "./JarvisCore";
 import { notifyHubChanged } from "@/lib/jarvis-events";
@@ -129,6 +129,7 @@ export function TodayJarvis({
     [send],
   );
   const { supported: voiceSupported, listening, interim, start, stop } = useVoice(onVoice);
+  useSpaceToTalk({ enabled: voiceSupported, listening, start, stop });
 
   useEffect(() => {
     let cancelled = false;
@@ -287,7 +288,7 @@ export function TodayJarvis({
                 "grid h-9 w-9 shrink-0 place-items-center rounded-full",
                 listening ? "bg-finance text-white" : "text-ink-soft hover:text-ink",
               )}
-              title={listening ? "Stop listening" : "Talk to Jarvis"}
+              title={listening ? "Stop listening (Space)" : "Talk to Jarvis (Space)"}
               aria-pressed={listening}
             >
               <Mic size={15} />

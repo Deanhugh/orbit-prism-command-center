@@ -10,7 +10,7 @@ import type { AgentRuntimeInfo, Task } from "@/lib/types";
 import { DEPARTMENTS } from "@/lib/office-data";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
-import { useVoice } from "@/lib/use-voice";
+import { useSpaceToTalk, useVoice } from "@/lib/use-voice";
 import { HeaderControls } from "@/components/chrome/HeaderControls";
 import { PageNav } from "@/components/chrome/PageNav";
 import { BrainGraphOverlay } from "@/components/chrome/BrainGraphOverlay";
@@ -175,6 +175,7 @@ export function MessagesApp({ username }: { username: string }) {
 
   const onVoice = useCallback((t: string) => setInput((prev) => (prev ? prev + " " : "") + t), []);
   const { supported: voiceSupported, listening, start, stop } = useVoice(onVoice);
+  useSpaceToTalk({ enabled: voiceSupported, listening, start, stop });
 
   useEffect(() => {
     fetch("/api/agents/conversations").then((r) => r.json()).then((d) => setConvs(d.conversations || [])).catch(() => {});
@@ -534,7 +535,7 @@ export function MessagesApp({ username }: { username: string }) {
                   onMouseDown={start}
                   onMouseUp={stop}
                   className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full", listening ? "bg-finance text-white" : "text-ink-soft hover:bg-canvas-2 hover:text-ink")}
-                  title="Hold to talk"
+                  title="Hold to talk, or press Space"
                 >
                   <Mic size={15} />
                 </button>
