@@ -5,6 +5,8 @@ import {
   baseUrlFor,
 } from "./providers";
 import { claudePrompt, claudeStatus } from "./claude";
+import type { ChatUsage } from "../agents-types";
+import { estimateTokens } from "../artifacts";
 
 export interface ChatMsg {
   role: "system" | "user" | "assistant" | "tool";
@@ -16,7 +18,7 @@ export interface ChatMsg {
 export type StreamEvent =
   | { type: "token"; text: string }
   | { type: "tool"; name: string; status: "running" | "done" | "error"; detail?: string }
-  | { type: "done"; content: string }
+  | { type: "done"; content: string; usage?: ChatUsage }
   | { type: "error"; error: string };
 
 // OpenAI-compatible tool schema (function calling)
@@ -172,6 +174,7 @@ async function* openaiCompatStream(opts: ChatOpts): AsyncGenerator<StreamEvent> 
   const base = baseUrlFor(opts.provider);
   const messages = [...opts.messages];
   let finalContent = "";
+  let lastUsage: ChatUsage | undefined;
 
   for (let round = 0; round < 4; round++) {
     const body: Record<string, unknown> = {
@@ -179,6 +182,7 @@ async function* openaiCompatStream(opts: ChatOpts): AsyncGenerator<StreamEvent> 
       messages,
       temperature: opts.temperature ?? 0.6,
       stream: true,
+      stream_options: { include_usage: true },
     };
     if (opts.tools?.length) {
       body.tools = opts.tools;
@@ -216,6 +220,8 @@ async function* openaiCompatStream(opts: ChatOpts): AsyncGenerator<StreamEvent> 
         if (payload === "[DONE]") { done = true; break; }
         try {
           const json = JSON.parse(payload);
+          const fromChunk = usageFromPayload(json);
+          if (fromChunk) lastUsage = fromChunk;
           const delta = json.choices?.[0]?.delta;
           if (delta?.content) {
             content += delta.content;
@@ -264,7 +270,7 @@ async function* openaiCompatStream(opts: ChatOpts): AsyncGenerator<StreamEvent> 
     break; // no tools -> finished
   }
 
-  yield { type: "done", content: finalContent };
+  yield { type: "done", content: finalContent, usage: lastUsage || estimateUsage(opts.messages, finalContent) };
 }
 
 async function* claudeStream(opts: ChatOpts): AsyncGenerator<StreamEvent> {
@@ -279,7 +285,7 @@ async function* claudeStream(opts: ChatOpts): AsyncGenerator<StreamEvent> {
     yield { type: "token", text: p };
     await sleep(12);
   }
-  yield { type: "done", content: out };
+  yield { type: "done", content: out, usage: estimateUsage(opts.messages, out) };
 }
 
 async function* demoStream(opts: ChatOpts): AsyncGenerator<StreamEvent> {
@@ -301,8 +307,26 @@ async function* demoStream(opts: ChatOpts): AsyncGenerator<StreamEvent> {
     yield { type: "token", text: p };
     await sleep(18);
   }
-  yield { type: "done", content: reply };
+  yield { type: "done", content: reply, usage: estimateUsage(opts.messages, reply) };
 }
 
 function truncate(s: string, n: number) { return s.length > n ? s.slice(0, n) + "…" : s; }
 function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
+function usageFromPayload(json: { usage?: Record<string, unknown> }): ChatUsage | null {
+  const u = json?.usage;
+  if (!u) return null;
+  const prompt = Number(u.prompt_tokens || u.input_tokens || 0);
+  const completion = Number(u.completion_tokens || u.output_tokens || 0);
+  const total = Number(u.total_tokens || prompt + completion);
+  const details = (u.prompt_tokens_details || {}) as Record<string, unknown>;
+  const cached = Number(details.cached_tokens || u.prompt_cache_hit_tokens || 0);
+  if (!prompt && !completion && !total) return null;
+  return { promptTokens: prompt, completionTokens: completion, totalTokens: total || prompt + completion, cachedTokens: cached };
+}
+
+function estimateUsage(messages: ChatMsg[], content: string): ChatUsage {
+  const prompt = messages.reduce((n, m) => n + estimateTokens(m.content || ""), 0);
+  const completion = estimateTokens(content);
+  return { promptTokens: prompt, completionTokens: completion, totalTokens: prompt + completion, cachedTokens: 0, estimated: true };
+}

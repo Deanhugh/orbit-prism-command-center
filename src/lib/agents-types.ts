@@ -4,6 +4,14 @@ export interface ChatToolStep {
   detail?: string;
 }
 
+export interface ChatUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  cachedTokens: number;
+  estimated?: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -12,6 +20,7 @@ export interface ChatMessage {
   agentId?: string;
   agentName?: string;
   tools?: ChatToolStep[];
+  usage?: ChatUsage;
 }
 
 export interface AgentConversation {
