@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { cn } from "@/lib/utils";
-import { PageNav } from "@/components/chrome/PageNav";
-import { Brand } from "@/components/chrome/Brand";
+import { OfficeHeader } from "@/components/chrome/OfficeHeader";
 
 type InvoiceState = "DRAFT" | "SENT" | "PARTIAL" | "PAID" | "OVERDUE";
 type BillState = "OPEN" | "APPROVED" | "PAID";
@@ -69,16 +68,7 @@ export function FinanceBoard() {
 
   return (
     <div className="min-h-screen w-screen overflow-y-auto bg-canvas text-ink">
-      <header className="flex items-center justify-between border-b border-line bg-panel/70 px-6 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Brand />
-          <PageNav />
-          <div className="flex items-baseline gap-3">
-            <h1 className="serif text-[15px] font-bold">Finance</h1>
-            <span className="hidden text-[11px] text-ink-soft sm:inline">The books · powered by Bigcapital</span>
-          </div>
-        </div>
-      </header>
+      <OfficeHeader title="Finance" subtitle="The books · powered by Bigcapital" />
 
       <div className="mx-auto max-w-[1200px] px-6 py-4">
         {/* view switch + status + open-in-bigcapital */}

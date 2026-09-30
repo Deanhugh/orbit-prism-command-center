@@ -6,7 +6,7 @@ https://command-center-production-e72e.up.railway.app/
 
 Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
 
-The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center and Agents Office share the **top-right** nav: **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**, then **Live · OpenRouter** and the clock — every pill opens that page. There is no Email / Mautic item in nav. The Agents Office **top-left** column is 360px wide and shows the full **Orbit Prism Operating System Command Center** lockup (same mark as Jarvis) — Jarvis / Agents pills live in the top-right, not beside the logo. Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
+The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center, Agents Office, Marketing, Studio, Sales, PMO, CAD, Finance, and Vault share the **same top-right** cluster: **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**, then **Live · OpenRouter** and the clock. The pills never sit next to the logo or page title on the left — logo/title stay left, nav stays right. There is no Email / Mautic item in nav. The Agents Office **top-left** column is 360px wide and shows the full **Orbit Prism Operating System Command Center** lockup (same mark as Jarvis). Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
 
 What landed in this stack:
 
@@ -18,7 +18,7 @@ What landed in this stack:
 - **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
 - **CAD** (`/cad`) and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
 - **Agents Office** — three-pane floor (desks, chat, artifact downloads); 360px left column with the full Orbit Prism lockup; chat-pill model list hides Demo
-- **Command Center chrome** — same top-right page nav + Live + clock as Agents Office; left System → MCP lists enabled apps (icon + name)
+- **Command Center chrome** — same top-right page nav + Live + clock as Agents Office; that cluster stays right-aligned on every office page; left System → MCP lists enabled apps (icon + name)
 
 ## Run locally
 
