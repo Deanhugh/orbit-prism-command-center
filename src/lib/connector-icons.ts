@@ -78,6 +78,8 @@ const COLOR: Record<string, string> = {
   apify: "#96d000",
   krea: "#111111",
   kreaai: "#111111",
+  higgsfield: "#7c5cfc",
+  higgsfeild: "#7c5cfc",
   mautic: "#4e5e9e",
 };
 

@@ -12,7 +12,7 @@ What landed in this stack:
 
 - **Live** follows OpenRouter (or another HTTP provider), not the Claude CLI
 - **Skills** — four originals plus 33 `agency-*` desk playbooks
-- **Remote MCP** on Railway — Notion, Apify (scrape), Krea (image/video), GitHub, Stripe
+- **Remote MCP** on Railway — Notion, Apify (scrape), Krea (image/video), Higgsfield (image/video/audio), GitHub, Stripe
 - **Routines** — Morning Brief and Evening Wrap on the dashboard
 - **Jarvis Today** — spoken/typed chat that can dispatch office work
 - **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
@@ -157,7 +157,7 @@ OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens s
 3. **Connect with OAuth** or **Save token**, then **Test**.
 4. Green / `connected` means agents can use it on live tasks. `needs_auth` means the URL is saved but there is no working token yet.
 
-That is the same pattern for Notion, Apify, Krea, GitHub, Stripe, and any other hosted MCP.
+That is the same pattern for Notion, Apify, Krea, Higgsfield, GitHub, Stripe, and any other hosted MCP.
 
 #### Notion
 
@@ -190,6 +190,16 @@ The page at [www.krea.ai/mcp](https://www.krea.ai/mcp) is the setup guide. The S
 
 OAuth bills compute units on the workspace you pick at consent. API tokens bill the workspace API balance. Optional env: `KREA_API_TOKEN`.
 
+#### Higgsfield (images + video + audio)
+
+The Streamable HTTP server is `https://mcp.higgsfield.ai/mcp`. Higgsfield MCP is **OAuth only** — there is no API key. Pasting higgsfield.ai as a custom MCP is rewritten to that endpoint.
+
+1. Open **Settings → MCP** → **Higgsfield — live remote MCP**.
+2. **Connect with OAuth** and sign in at [higgsfield.ai](https://higgsfield.ai).
+3. Click **Test**. Agents then generate images, video, Soul characters, or audio only on live tasks that mention Higgsfield or ask to generate — not on every office task.
+
+MCP generations use your Higgsfield plan credits (not the unlimited web allowance). OAuth uses the MCP-native authorization server at `mcp.higgsfield.ai` (PKCE + dynamic client registration), not Clerk device-auth.
+
 #### GitHub and Stripe
 
 Same remote pattern from **Browse MCP**:
@@ -211,7 +221,7 @@ Enable the tile, connect, **Test**. Local `npx` GitHub/Stripe servers in the cat
 
 ### Jarvis Today
 
-The Jarvis home (`/jarvis`) chat — typed or spoken — is **Today**: brief, who is waiting, calendar, then office work. Jarvis addresses the owner as **Howard** (Settings → General still overrides the first name). The Today transcript clears at the end of each day in the hub timezone (`America/New_York` by default) so the box starts empty each morning. The Today card shows an animated wireframe AI core (not a photo bust). Spoken or typed personal updates (“add a task Friday on my calendar”, “remind me tomorrow”, “new habit”, “set a goal”, “add project Harbourside”, “save this URL to Knowledge”) write onto the hub and show immediately on **Calendar**, **Tasks**, **Habits**, **Goals**, **Reminders**, **Projects**, and **Knowledge**. Those cards start empty — no sample dentist/Wei/Harbourside rows — so you fill them. “Clear my reminders” (or calendar, tasks, habits, goals, projects, knowledge, or everything) empties that section on the dashboard and drops it from Morning Brief and Evening Wrap. “Clear the morning brief” (or today’s brief) wipes the dated Morning Brief Today list; office desk tickets no longer refill it — only personal hub items do. Morning Brief and Evening Wrap refresh from that same hub, so the new or cleared item is in the next brief. When the owner asks to build, film, invoice, scrape, or generate, Jarvis dispatches the task onto the Agents floor. Every desk may run CRM, Plane, books, TryPost, Studio, CAD, Notion, GitHub, Apify, and Krea. Confirmations stay short and spoken-friendly. Live MCP results (Notion search, Apify scrape, Krea generate) attach when the message matches those apps.
+The Jarvis home (`/jarvis`) chat — typed or spoken — is **Today**: brief, who is waiting, calendar, then office work. Jarvis addresses the owner as **Howard** (Settings → General still overrides the first name). The Today transcript clears at the end of each day in the hub timezone (`America/New_York` by default) so the box starts empty each morning. The Today card shows an animated wireframe AI core (not a photo bust). Spoken or typed personal updates (“add a task Friday on my calendar”, “remind me tomorrow”, “new habit”, “set a goal”, “add project Harbourside”, “save this URL to Knowledge”) write onto the hub and show immediately on **Calendar**, **Tasks**, **Habits**, **Goals**, **Reminders**, **Projects**, and **Knowledge**. Those cards start empty — no sample dentist/Wei/Harbourside rows — so you fill them. “Clear my reminders” (or calendar, tasks, habits, goals, projects, knowledge, or everything) empties that section on the dashboard and drops it from Morning Brief and Evening Wrap. “Clear the morning brief” (or today’s brief) wipes the dated Morning Brief Today list; office desk tickets no longer refill it — only personal hub items do. Morning Brief and Evening Wrap refresh from that same hub, so the new or cleared item is in the next brief. When the owner asks to build, film, invoice, scrape, or generate, Jarvis dispatches the task onto the Agents floor. Every desk may run CRM, Plane, books, TryPost, Studio, CAD, Notion, GitHub, Apify, Krea, and Higgsfield. Confirmations stay short and spoken-friendly. Live MCP results (Notion search, Apify scrape, Krea/Higgsfield generate) attach when the message matches those apps.
 
 **Voice:** Morning Brief, Evening Wrap, and Today speak through a [Fish Audio](https://fish.audio/) library voice, not the browser’s default system voice. Open **Settings → Voice** (`/jarvis/settings?tab=voice`). Paste `FISH_API_KEY` (or set the same name on Railway), pick a public library voice (default is **JARVIS**), and Preview. Default model is `s2.1-pro-free` (Fish’s free developer tier). `s2.1-pro` needs [API credit](https://fish.audio/app/developers) — that wallet is separate from Fish website credit. If paid TTS returns insufficient credit, Command Center retries `s2.1-pro-free`. If Fish is down or still refuses, browser `speechSynthesis` runs and Settings shows the Fish error. This is a REST TTS call (`POST /api/jarvis/voice/speak`) — not an MCP connector.
 
@@ -268,7 +278,7 @@ Prompt a film yourself, or pick **Product film / Explainer / Trailer / Reel**. B
 - Named cuts: product film, explainer, trailer, vertical reel, talking-head, documentary. Other prompts get a five-shot branded spot.
 - Marketing tasks that mention video / reel / trailer / explainer write a cut and link `/studio`
 
-This is **not** OpenMontage and it does **not** render a finished MP4. There is no Veo, Kling, Remotion, or FFmpeg export. It is the office cut — a playable storyboard — the same way CAD is a text-to-part viewport, not SolidWorks. A real rendered video still needs a separate [OpenMontage](https://github.com/calesthio/OpenMontage) checkout or a video-model key later. Krea MCP (above) is the live path for generated stills and clips when a task asks for an image or video.
+This is **not** OpenMontage and it does **not** render a finished MP4. There is no Veo, Kling, Remotion, or FFmpeg export. It is the office cut — a playable storyboard — the same way CAD is a text-to-part viewport, not SolidWorks. A real rendered video still needs a separate [OpenMontage](https://github.com/calesthio/OpenMontage) checkout or a video-model key later. Krea or Higgsfield MCP (above) is the live path for generated stills and clips when a task asks for an image or video.
 
 ### Vault — `/vault` (3D brain)
 

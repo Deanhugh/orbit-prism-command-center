@@ -12,6 +12,12 @@ import {
 import { isNotionMcpUrl, looksLikeNotionToken, notionRestProbe, notionRestSearch } from "./notion-rest";
 import { isApifyConnector, looksLikeScrapeQuery, runApifyForQuery } from "./mcp-apify";
 import { isKreaConnector, looksLikeKreaQuery, normalizeKreaUrl, runKreaForQuery } from "./mcp-krea";
+import {
+  isHiggsfieldConnector,
+  looksLikeHiggsfieldQuery,
+  normalizeHiggsfieldUrl,
+  runHiggsfieldForQuery,
+} from "./mcp-higgsfield";
 
 const probeCache = new Map<string, { at: number; value: McpProbe }>();
 
@@ -40,7 +46,12 @@ export async function probeRemoteConnector(conn: CustomConnector, force = false)
     return value;
   }
 
-  const mcp = await openMcpSession({ key, url: isKreaConnector(conn) ? normalizeKreaUrl(conn.target) : conn.target, token });
+  const url = isHiggsfieldConnector(conn)
+    ? normalizeHiggsfieldUrl(conn.target)
+    : isKreaConnector(conn)
+      ? normalizeKreaUrl(conn.target)
+      : conn.target;
+  const mcp = await openMcpSession({ key, url, token });
   if (mcp.ok) {
     probeCache.set(cacheKey, { at: Date.now(), value: mcp });
     return mcp;
@@ -92,6 +103,14 @@ export async function searchRemoteConnector(conn: CustomConnector, query: string
     }
   }
 
+  if (isHiggsfieldConnector(conn) && probe.session) {
+    try {
+      return await runHiggsfieldForQuery(probe.session, query);
+    } catch (err) {
+      return err instanceof Error ? err.message : "Higgsfield request failed";
+    }
+  }
+
   if (probe.session) {
     const tools = pickSearchTools(probe.session.tools.length ? probe.session.tools : probe.tools);
     const tool = tools[0];
@@ -118,6 +137,7 @@ export async function mcpContextForQuery(query: string): Promise<{ key: string; 
   for (const conn of remoteConnectors()) {
     if (isApifyConnector(conn) && !looksLikeScrapeQuery(q) && !/\bapify\b/i.test(q)) continue;
     if (isKreaConnector(conn) && !looksLikeKreaQuery(q)) continue;
+    if (isHiggsfieldConnector(conn) && !looksLikeHiggsfieldQuery(q)) continue;
     const text = await searchRemoteConnector(conn, q);
     if (text) out.push({ key: mcpKey(conn.name), name: conn.name, text: text.slice(0, 2500) });
   }

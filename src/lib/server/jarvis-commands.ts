@@ -141,7 +141,7 @@ const APPOINTMENT_RE =
 const INQUIRY_RE =
   /\b(what'?s|what is|who is|show me|list|on the board|morning brief|evening wrap)\b/i;
 const OFFICE_DESK_RE =
-  /\b(cad|studio|invoice|scrape|apify|krea|notion|github|film|reel|bracket|plane ticket|enrich a lead|reconcil)\b/i;
+  /\b(cad|studio|invoice|scrape|apify|krea|higgsfield|higgsfeild|notion|github|film|reel|bracket|plane ticket|enrich a lead|reconcil)\b/i;
 
 export function looksLikePersonalUpdate(text: string, kind?: string): boolean {
   if (kind === "brief") return false;

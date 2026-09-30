@@ -134,18 +134,49 @@ export async function discoverAuthServer(mcpUrl: string): Promise<{
 
   const resource = canonicalMcpUrl(String(protectedMd?.resource || mcp));
   const servers = stringList(protectedMd?.authorization_servers);
-  const issuer = (servers[0] || origin).replace(/\/+$/, "");
-  const meta =
-    ((await getJson(`${issuer}/.well-known/oauth-authorization-server`)) as OAuthMeta | null) ||
-    ((await getJson(`${issuer}/.well-known/openid-configuration`)) as OAuthMeta | null) ||
-    {};
+  // Try the MCP origin first so Higgsfield (and similar) use the native
+  // PKCE/DCR server at mcp.higgsfield.ai instead of Clerk or device-auth.
+  const candidates = [origin, ...servers]
+    .map((s) => s.replace(/\/+$/, ""))
+    .filter((s, i, arr) => Boolean(s) && arr.indexOf(s) === i)
+    .filter((s) => !isDeviceAuthIssuer(s));
+
+  let picked: OAuthMeta | null = null;
+  let fallback: OAuthMeta | null = null;
+  for (const issuer of candidates) {
+    const found = await loadAsMeta(issuer);
+    if (!found?.authorization_endpoint || !found.token_endpoint) continue;
+    if (!fallback) fallback = found;
+    if (found.registration_endpoint) {
+      picked = found;
+      break;
+    }
+  }
+  const meta = picked || fallback || {};
   const scopes =
     stringList(meta.scopes_supported).length
       ? stringList(meta.scopes_supported)
       : stringList(protectedMd?.scopes_supported).length
         ? stringList(protectedMd?.scopes_supported)
-        : ["default"];
+        : [];
   return { resource, meta: meta || {}, scopes };
+}
+
+function isDeviceAuthIssuer(issuer: string): boolean {
+  try {
+    const host = new URL(issuer).hostname.toLowerCase();
+    return host.includes("device-auth") || host.startsWith("fnf-");
+  } catch {
+    return /device-auth/i.test(issuer);
+  }
+}
+
+async function loadAsMeta(issuer: string): Promise<OAuthMeta | null> {
+  const base = issuer.replace(/\/+$/, "");
+  return (
+    ((await getJson(`${base}/.well-known/oauth-authorization-server`)) as OAuthMeta | null) ||
+    ((await getJson(`${base}/.well-known/openid-configuration`)) as OAuthMeta | null)
+  );
 }
 
 async function registerClient(
@@ -222,7 +253,7 @@ export async function startMcpOAuth(opts: {
   u.searchParams.set("state", state);
   u.searchParams.set("code_challenge", challenge);
   u.searchParams.set("code_challenge_method", "S256");
-  u.searchParams.set("scope", scopes.join(" "));
+  if (scopes.length) u.searchParams.set("scope", scopes.join(" "));
   u.searchParams.set("resource", resource);
   return { authorizeUrl: u.toString() };
 }

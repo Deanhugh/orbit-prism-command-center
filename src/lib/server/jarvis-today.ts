@@ -267,7 +267,7 @@ export async function answerTodayChat(
   if (!status.ok) return { reply: todayFallbackReply(userId, username, text, kind), applied: null };
 
   let mcpBlock = "";
-  if (/\b(notion|wiki|workspace page|knowledge base|apify|scrape|instagram|tiktok|facebook|linkedin|serp|google search|krea|generate (an |a )?(image|video)|text[- ]to[- ]image|website|https?:\/\/)\b/i.test(text)) {
+  if (/\b(notion|wiki|workspace page|knowledge base|apify|scrape|instagram|tiktok|facebook|linkedin|serp|google search|krea|higgsfield|higgsfeild|generate (an |a )?(image|video)|text[- ]to[- ]image|website|https?:\/\/)\b/i.test(text)) {
     try {
       const { formatMcpContext, mcpContextForQuery } = await import("./mcp-remote");
       mcpBlock = formatMcpContext(await mcpContextForQuery(text));
