@@ -7,25 +7,27 @@ import { cn } from "@/lib/utils";
 /**
  * Orbit Prism wordmark + "Operating System Command Center" subtitle.
  * Placed in the top-left corner of every page. Links home (Jarvis).
- * Use size="office" in the Agents Office left column: the full Command Center
- * lockup (same asset as Jarvis) at readable size, not the thin 16px bar.
+ * Use size="office" in the Agents Office left column and size="header" on
+ * Marketing / Studio / Sales / PMO / CAD / Finance / Vault: the full Command
+ * Center lockup (same asset as Jarvis), not the thin 16px ink bar.
  */
 export function Brand({
   tone = "default",
   size = "default",
 }: {
   tone?: "default" | "dark";
-  size?: "default" | "office";
+  size?: "default" | "office" | "header";
 }) {
   const dark = tone === "dark";
-  const office = size === "office";
+  const lockup = size === "office" || size === "header";
 
-  if (office) {
+  if (lockup) {
+    const header = size === "header";
     return (
       <Link
         href="/jarvis"
         title="Orbit Prism Operating System Command Center"
-        className="block min-w-0"
+        className={cn("block shrink-0", header ? "w-[220px] sm:w-[268px]" : "min-w-0")}
       >
         <Image
           src="/orbit-command-center.png"
@@ -34,7 +36,10 @@ export function Brand({
           height={60}
           priority
           unoptimized
-          className="h-auto w-full max-w-[320px] bg-transparent [mix-blend-mode:screen]"
+          className={cn(
+            "h-auto bg-transparent [mix-blend-mode:screen]",
+            header ? "w-full" : "w-full max-w-[320px]",
+          )}
         />
       </Link>
     );

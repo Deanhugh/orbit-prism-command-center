@@ -118,23 +118,7 @@ export function VaultPage() {
       {!cinema && (
         <OfficeHeader
           tone="dark"
-          brand={false}
           className="pointer-events-none absolute inset-x-0 top-0 z-20 border-0 bg-transparent"
-          left={
-            <div className="pointer-events-auto flex flex-col items-start leading-none">
-              <Image
-                src="/orbit-logo-white.png"
-                alt="Orbit Prism"
-                width={258}
-                height={24}
-                priority
-                className="h-6 w-auto"
-              />
-              <span className="mt-1 pl-0.5 text-[8px] font-semibold uppercase tracking-[0.18em]" style={{ color: C.muted }}>
-                Operating System Command Center
-              </span>
-            </div>
-          }
           extra={
             <button onClick={logout} className="pointer-events-auto text-[9px] tracking-[0.2em] hover:text-white" style={{ color: C.muted }}>
               SIGN OUT
@@ -145,7 +129,7 @@ export function VaultPage() {
 
       {/* search */}
       {!cinema && (
-        <div className="absolute left-1/2 top-16 z-20 w-[min(420px,80vw)] -translate-x-1/2">
+        <div className="absolute left-1/2 top-[88px] z-20 w-[min(420px,80vw)] -translate-x-1/2">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
