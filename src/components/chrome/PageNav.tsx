@@ -10,12 +10,12 @@ const PRIMARY = [
 ] as const;
 
 const REST = [
+  { href: "/pmo", label: "PMO" },
+  { href: "/sales", label: "Sales" },
+  { href: "/finance", label: "Finance" },
   { href: "/marketing", label: "Marketing" },
   { href: "/studio", label: "Studio" },
-  { href: "/sales", label: "Sales" },
-  { href: "/pmo", label: "PMO" },
   { href: "/cad", label: "CAD" },
-  { href: "/finance", label: "Finance" },
   { href: "/vault", label: "Vault" },
 ] as const;
 
@@ -26,7 +26,8 @@ function isActive(pathname: string, href: string) {
 
 /**
  * Shared office-page nav. Lives in the top-right HeaderControls cluster
- * (Jarvis · Agents · Marketing · …). The Agents Office left column shows
+ * (Jarvis · Agents · PMO · Sales · Finance · Marketing · Studio · CAD · Vault).
+ * The Agents Office left column shows
  * only the Orbit Prism wordmark — not this bar.
  */
 export function PageNav({
