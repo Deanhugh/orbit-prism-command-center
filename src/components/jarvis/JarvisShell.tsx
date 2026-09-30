@@ -29,6 +29,7 @@ import { HeaderControls } from "@/components/chrome/HeaderControls";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
 import { McpNav } from "@/components/jarvis/McpNav";
+import type { McpNavApp } from "@/lib/mcp-nav";
 
 const APPS = [
   { href: "/jarvis/briefing", label: "Briefing", icon: Newspaper, ai: true },
@@ -54,10 +55,12 @@ export function JarvisShell({
   username,
   children,
   needsGuest = false,
+  initialMcpApps = [],
 }: {
   username: string;
   children: React.ReactNode;
   needsGuest?: boolean;
+  initialMcpApps?: McpNavApp[];
 }) {
   const { hub } = useJarvisHub();
   const pathname = usePathname() || APP_HOME;
@@ -126,6 +129,7 @@ export function JarvisShell({
           pathname={pathname}
           username={username}
           avatarUrl={hub?.profile.logoUrl || "/profile.png"}
+          mcpApps={initialMcpApps}
           onToggle={toggleSidebar}
           onLogout={logout}
         />
@@ -144,6 +148,7 @@ export function JarvisShell({
               pathname={pathname}
               username={username}
               avatarUrl={hub?.profile.logoUrl || "/profile.png"}
+              mcpApps={initialMcpApps}
               onToggle={() => setMobileNav(false)}
               onNavigate={() => setMobileNav(false)}
               onLogout={logout}
@@ -181,6 +186,7 @@ function SidebarBody({
   pathname,
   username,
   avatarUrl,
+  mcpApps,
   onToggle,
   onNavigate,
   onLogout,
@@ -189,6 +195,7 @@ function SidebarBody({
   pathname: string;
   username: string;
   avatarUrl: string;
+  mcpApps: McpNavApp[];
   onToggle: () => void;
   onNavigate?: () => void;
   onLogout: () => void;
@@ -268,7 +275,7 @@ function SidebarBody({
             onNavigate={onNavigate}
           />
         ))}
-        <McpNav open={open} onNavigate={onNavigate} />
+        <McpNav open={open} onNavigate={onNavigate} initialApps={mcpApps} />
       </nav>
       <div className="border-t border-line px-2 py-2">
         <NavLink

@@ -35,16 +35,18 @@ function AppMark({ app }: { app: McpNavApp }) {
 export function McpNav({
   open,
   onNavigate,
+  initialApps = [],
 }: {
   open: boolean;
   onNavigate?: () => void;
+  initialApps?: McpNavApp[];
 }) {
-  const [apps, setApps] = useState<McpNavApp[]>([]);
+  const [apps, setApps] = useState<McpNavApp[]>(initialApps);
 
   const load = useCallback(() => {
-    fetch("/api/settings/connectors")
+    fetch("/api/settings/connectors?nav=1")
       .then((r) => r.json())
-      .then((d) => setApps(mcpNavApps(d)))
+      .then((d) => setApps(Array.isArray(d.apps) ? d.apps : mcpNavApps(d)))
       .catch(() => {});
   }, []);
 
