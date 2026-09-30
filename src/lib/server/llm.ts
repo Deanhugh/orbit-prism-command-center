@@ -7,6 +7,8 @@ import {
 import { claudePrompt, claudeStatus } from "./claude";
 import type { ChatUsage } from "../agents-types";
 import { estimateTokens } from "../artifacts";
+import { OPENROUTER_FAVORITES } from "../openrouter-favorites";
+import { jevAllowTool } from "./jev";
 
 export interface ChatMsg {
   role: "system" | "user" | "assistant" | "tool";
@@ -80,8 +82,11 @@ export async function listModels(id: ProviderId): Promise<string[]> {
   if (id === "claude") return ["sonnet", "opus", "fable"];
   if (id === "demo") return ["demo"];
   const base = baseUrlFor(id);
-  if (!base) return [];
+  if (!base) return id === "openrouter" ? OPENROUTER_FAVORITES.map((f) => f.id) : [];
   const names = new Set<string>();
+  if (id === "openrouter") {
+    for (const f of OPENROUTER_FAVORITES) names.add(f.id);
+  }
   for (const b of urlVariants(base)) {
     try {
       const res = await fetch(`${b}/models`, {
@@ -257,8 +262,15 @@ async function* openaiCompatStream(opts: ChatOpts): AsyncGenerator<StreamEvent> 
         let result = "";
         try {
           const args = c.args ? JSON.parse(c.args) : {};
-          result = await opts.execTool(c.name, args);
-          yield { type: "tool", name: c.name, status: "done", detail: result.slice(0, 80) };
+          const task = [...messages].reverse().find((m) => m.role === "user")?.content || "";
+          const gate = await jevAllowTool({ task, tool: c.name, args });
+          if (!gate.allow) {
+            result = gate.reason;
+            yield { type: "tool", name: c.name, status: "error", detail: "blocked by Jev" };
+          } else {
+            result = await opts.execTool(c.name, args);
+            yield { type: "tool", name: c.name, status: "done", detail: result.slice(0, 80) };
+          }
         } catch (e) {
           result = `error: ${String(e).slice(0, 80)}`;
           yield { type: "tool", name: c.name, status: "error", detail: result };

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { OPENROUTER_FAVORITES } from "@/lib/openrouter-favorites";
 
 interface ProviderRow {
   id: string; label: string; local: boolean; openaiCompatible: boolean;
@@ -222,7 +223,12 @@ export function Providers() {
               className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]"
             />
             <datalist id="orbit-model-list">
-              {models.map((m) => <option key={m} value={m} />)}
+              {OPENROUTER_FAVORITES.map((f) => (
+                <option key={`fav:${f.id}`} value={f.id} label={f.label} />
+              ))}
+              {models.filter((m) => !OPENROUTER_FAVORITES.some((f) => f.id === m)).map((m) => (
+                <option key={m} value={m} />
+              ))}
             </datalist>
             <button onClick={saveModel} disabled={busy === "model"} className="rounded-md border border-line px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide disabled:opacity-40">{busy === "model" ? "Saving…" : "Save"}</button>
           </div>
@@ -232,6 +238,37 @@ export function Providers() {
             <span className="tabular-nums">{cfg?.temperature ?? 0.6}</span>
           </label>
         </div>
+        {cfg?.provider === "openrouter" && (
+          <div className="mt-3">
+            <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-ink-soft">OpenRouter favorites</p>
+            <div className="flex flex-wrap gap-1.5">
+              {OPENROUTER_FAVORITES.map((f) => {
+                const on = cfg.model === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    title={f.hint}
+                    onClick={() => {
+                      setModelDraft(f.id);
+                      void save({ provider: "openrouter", model: f.id }, `Saved. Active model is now ${f.label}.`);
+                    }}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                      on ? "border-ink bg-ink text-canvas" : "border-line bg-canvas text-ink hover:bg-canvas-2",
+                    )}
+                  >
+                    {f.label}
+                    {f.id === "typesafe/jev-router" ? <span className="ml-1 text-[9px] uppercase tracking-wide opacity-70">optional</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[10px] text-ink-soft">
+              Gemini 1.5 is retired on OpenRouter — Flash and Pro here are the current Gemini line. Jev Router is optional (Jev picks which LLM answers). Desk routing and tool gates always use TypeSafe Jev 1.13 in the background when this OpenRouter key is set.
+            </p>
+          </div>
+        )}
         {cfg?.model ? (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink">
             <span className="rounded-full bg-emails/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emails">Saved</span>
@@ -262,7 +299,7 @@ export function Providers() {
         <ol className="list-decimal space-y-1 pl-4 text-[11px] text-ink-soft">
           <li>Create a key at <a className="underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>. Put it in Railway as <code>OPENROUTER_API_KEY</code>, or paste it in the OpenRouter row below.</li>
           <li>Set Active provider to <strong>OpenRouter</strong>. Base URL stays <code>https://openrouter.ai/api/v1</code>.</li>
-          <li>Pick any model OpenRouter lists (Claude, GPT, Gemini, Llama, Grok) and Save. Click Test — the header should read <strong>Live · OpenRouter</strong>.</li>
+          <li>Pick a favorite (Gemini Flash / Pro, Qwen, DeepSeek, or optional Jev Router) or any other OpenRouter id, then Save. Click Test — the header should read <strong>Live · OpenRouter</strong>.</li>
           <li>Ollama Cloud is optional: key at ollama.com, base URL <code>https://ollama.com/v1</code>. Local Ollama only works when this app runs on the Mac.</li>
         </ol>
       </section>

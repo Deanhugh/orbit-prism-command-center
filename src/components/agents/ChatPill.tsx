@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { PILL_PLACEHOLDER, isDemoChoice, mentionQuery, slashSuggestions, type SlashCmd } from "@/lib/chat-commands";
 import { formatTokens } from "@/lib/artifacts";
 import type { ChatUsage } from "@/lib/agents-types";
+import { OPENROUTER_FAVORITES, favoriteLabel } from "@/lib/openrouter-favorites";
 
 type ChatMode = "chat" | "task" | "plan";
 interface SkillInfo { name: string; description?: string; department: string | null; agents: string[] }
@@ -248,7 +249,7 @@ function ModeMenu({ value, onChange }: { value: ChatMode; onChange: (m: ChatMode
 
 function displayModel(value: string) {
   if (!value || isDemoChoice("", value)) return "Model";
-  return value;
+  return favoriteLabel(value) || value;
 }
 
 function ModelPicker({
@@ -266,9 +267,15 @@ function ModelPicker({
   const [query, setQuery] = useState("");
   const liveOptions = options.filter((o) => !isDemoChoice(o.provider, o.model));
   const q = query.trim().toLowerCase();
-  const filtered = q
+  const favorites = OPENROUTER_FAVORITES.filter((f) => {
+    if (!q) return true;
+    return f.id.toLowerCase().includes(q) || f.label.toLowerCase().includes(q) || f.hint.toLowerCase().includes(q);
+  });
+  const favIds = new Set(OPENROUTER_FAVORITES.map((f) => f.id));
+  const rest = (q
     ? liveOptions.filter((o) => o.model.toLowerCase().includes(q) || o.provider.toLowerCase().includes(q))
-    : liveOptions;
+    : liveOptions
+  ).filter((o) => !(o.provider === "openrouter" && favIds.has(o.model)));
 
   function choose(model: string, nextProvider?: string) {
     if (isDemoChoice(nextProvider, model)) return;
@@ -307,12 +314,36 @@ function ModelPicker({
               className="w-full border-b border-line bg-transparent px-3 py-2 text-[12px] outline-none"
             />
             <div className="thin-scroll max-h-56 overflow-y-auto py-1">
-              {filtered.length === 0 && (
+              {favorites.length > 0 && (
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-soft">Favorites</div>
+              )}
+              {favorites.map((f) => {
+                const selected = f.id === value && (provider === "openrouter" || !provider);
+                return (
+                  <button
+                    key={`fav:${f.id}`}
+                    type="button"
+                    onClick={() => choose(f.id, "openrouter")}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink hover:bg-canvas-2"
+                    title={f.hint}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {f.label}
+                      <span className="ml-1 text-[10px] text-ink-soft">{f.id}</span>
+                    </span>
+                    {selected && <Check size={13} className="shrink-0 text-ink" />}
+                  </button>
+                );
+              })}
+              {rest.length > 0 && (
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-soft">All models</div>
+              )}
+              {favorites.length === 0 && rest.length === 0 && (
                 <p className="px-3 py-2 text-[11px] text-ink-soft">
                   {query.trim() ? `Press Enter to use “${query.trim()}”` : "No models yet — type a name."}
                 </p>
               )}
-              {filtered.map((o) => {
+              {rest.map((o) => {
                 const selected = o.model === value && o.provider === provider;
                 return (
                   <button

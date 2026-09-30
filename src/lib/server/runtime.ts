@@ -13,6 +13,7 @@ import { getConnectors, connectorsForDept } from "./mcp";
 import { completePrompt } from "./llm";
 import { resolveOfficeMode } from "./office-mode";
 import { loadAgentsConfig } from "./providers";
+import { jevPickAgent, jevPickDept } from "./jev";
 import { retrieve, writeDeliverable } from "./brain";
 import { skillsForAgent } from "./skills";
 import { cadenceWithTime, parseCadence } from "./when";
@@ -175,6 +176,8 @@ function heuristicAgent(dept: DeptId, title: string): string {
   return best.id;
 }
 async function routeAgent(dept: DeptId, title: string): Promise<string> {
+  const fromJev = await jevPickAgent(dept, title);
+  if (fromJev) return fromJev;
   const s = state();
   if (s.mode === "live") {
     const roster = AGENTS_BY_DEPT[dept].map((a) => `${a.id}: ${a.name} — ${a.does}${a.lead ? " (department lead)" : ""}`).join("\n");
@@ -542,7 +545,7 @@ export async function jarvisRoute(instruction: string): Promise<JarvisResult> {
   const created: Task[] = [];
   let prevId: string | undefined;
   for (const step of steps.length ? steps : [clean]) {
-    const dept = pickDept(step);
+    const dept = (await jevPickDept(step)) || pickDept(step);
     const task = await createTask(step, dept, { origin: "jarvis", deps: prevId ? [prevId] : undefined });
     created.push(task); prevId = task.id;
   }
