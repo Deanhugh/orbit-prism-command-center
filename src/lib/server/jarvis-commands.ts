@@ -1,10 +1,12 @@
 import { shortId } from "../utils";
 import {
   blankDashboardLists,
+  type JarvisArticle,
   type JarvisEvent,
   type JarvisGoal,
   type JarvisHabit,
   type JarvisHub,
+  type JarvisProject,
   type JarvisReminder,
   type JarvisTask,
 } from "../jarvis-data";
@@ -21,7 +23,7 @@ import {
   zonedWallToUtc,
 } from "./zone";
 
-export type PersonalSurface = "calendar" | "task" | "habit" | "goal" | "reminder";
+export type PersonalSurface = "calendar" | "task" | "habit" | "goal" | "reminder" | "project" | "knowledge";
 
 export interface ParsedPersonalCommand {
   action: "add" | "clear";
@@ -32,6 +34,9 @@ export interface ParsedPersonalCommand {
   timeKnown: boolean;
   habitBlock: JarvisHabit["block"];
   goalCategory: string;
+  url: string;
+  knowledgeCategory: string;
+  projectStatus: JarvisProject["status"];
 }
 
 export interface AppliedPersonalUpdate {
@@ -46,6 +51,8 @@ export interface AppliedPersonalUpdate {
   habit?: JarvisHabit;
   goal?: JarvisGoal;
   reminder?: JarvisReminder;
+  project?: JarvisProject;
+  article?: JarvisArticle;
 }
 
 const WEEKDAYS: Record<string, number> = {
@@ -96,9 +103,9 @@ const MONTHS: Record<string, number> = {
 };
 
 const SURFACE_RE =
-  /\b(calendar|calander|calender|agenda|to-?dos?|tasks?|habits?|goals?|reminders?)\b|\bremind me\b|\bon my (day|plate|calendar|calander|calender)\b/i;
+  /\b(calendar|calander|calender|agenda|to-?dos?|tasks?|habits?|goals?|reminders?|projects?|knowledge|reading list|saved (pages?|links?))\b|\bremind me\b|\bon my (day|plate|calendar|calander|calender)\b/i;
 const ACTION_RE =
-  /\b(add|put|set|create|update|log|track|schedule|book|move|remember|remind|pencil|write)\b/i;
+  /\b(add|put|set|create|update|log|track|schedule|book|move|remember|remind|pencil|write|save|pin|file|store|keep|new)\b/i;
 const CLEAR_RE =
   /\b(clear|cleared|delete|remove|wipe|empty|reset|drop)\b|\bget rid of\b|\bno more\b|\btake (them|it|all) off\b/i;
 const ALL_SECTIONS_RE =
@@ -116,6 +123,16 @@ const GENERIC_TITLES = new Set([
   "board",
   "deck",
   "hub",
+  "project",
+  "projects",
+  "knowledge",
+  "article",
+  "articles",
+  "link",
+  "url",
+  "page",
+  "pages",
+  "reading",
 ]);
 const DATE_RE =
   /\b(today|tonight|tomorrow|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat|sunday|sun|next week|this week)\b/i;
@@ -139,6 +156,7 @@ export function looksLikePersonalUpdate(text: string, kind?: string): boolean {
   const hasAppointment = APPOINTMENT_RE.test(t);
   if (hasClear && looksLikeClearMorningBrief(t)) return true;
   if (hasClear && (hasSurface || ALL_SECTIONS_RE.test(t)) && !/\bmorning brief\b/.test(t)) return true;
+  if (hasAction && looksLikeKnowledgeSave(t)) return true;
   if (hasSurface && hasAction) return true;
   if (hasSurface && hasDate) return true;
   if (hasAppointment && (hasAction || hasDate)) return true;
@@ -192,7 +210,8 @@ export function parsePersonalCommand(
   const durationMin = /\ball[- ]day\b/i.test(text) ? 8 * 60 : /\bhour\b/i.test(text) ? 60 : 30;
   const endParts = addMinutes(day.year, day.month, day.day, hour, minute, durationMin);
   const end = zonedWallToUtc(tz, endParts.year, endParts.month, endParts.day, endParts.hour, endParts.minute);
-  const title = extractTitle(text);
+  const url = extractUrl(text);
+  const title = extractTitle(text, url);
   return {
     action,
     surfaces,
@@ -202,6 +221,9 @@ export function parsePersonalCommand(
     timeKnown: Boolean(time),
     habitBlock: inferHabitBlock(text, hour),
     goalCategory: inferGoalCategory(text),
+    url,
+    knowledgeCategory: inferKnowledgeCategory(text),
+    projectStatus: inferProjectStatus(text),
   };
 }
 
@@ -319,6 +341,55 @@ export async function applyPersonalCommand(
     }
   }
 
+  if (parsed.surfaces.includes("project")) {
+    const project: JarvisProject = {
+      id: shortId("pr"),
+      title: parsed.title,
+      status: parsed.projectStatus,
+      done: 0,
+      total: 1,
+      detail: "Added from Today",
+      progress: 0,
+    };
+    const existing = (hub.projects ?? []).find((p) => normalizeTitle(p.title) === normalizeTitle(project.title));
+    if (!existing) {
+      patch.projects = [...(hub.projects ?? []), project];
+      applied.project = project;
+    } else {
+      applied.project = existing;
+    }
+  }
+
+  if (parsed.surfaces.includes("knowledge")) {
+    const url = parsed.url;
+    const title =
+      parsed.title !== "Personal item"
+        ? parsed.title
+        : url
+          ? hostOf(url)
+          : "Saved page";
+    const article: JarvisArticle = {
+      id: shortId("a"),
+      title,
+      url: url || "",
+      category: parsed.knowledgeCategory,
+      note: url && parsed.title !== "Personal item" && parsed.title !== hostOf(url) ? parsed.title : "",
+      savedAt: now,
+    };
+    applied.title = title;
+    const existing = (hub.articles ?? []).find(
+      (a) =>
+        (article.url && a.url === article.url) ||
+        normalizeTitle(a.title) === normalizeTitle(article.title),
+    );
+    if (!existing) {
+      patch.articles = [article, ...(hub.articles ?? [])];
+      applied.article = article;
+    } else {
+      applied.article = existing;
+    }
+  }
+
   const saved = Object.keys(patch).length ? patchHub(userId, username, patch) : hub;
 
   try {
@@ -396,6 +467,20 @@ async function applyClearCommand(
       cleared += list.length - next.length;
       patch.reminders = next;
     }
+    if (surface === "project") {
+      const list = hub.projects ?? [];
+      const next = specific ? list.filter((p) => !titleMatch(p.title, parsed.title)) : [];
+      cleared += list.length - next.length;
+      patch.projects = next;
+    }
+    if (surface === "knowledge") {
+      const list = hub.articles ?? [];
+      const next = specific
+        ? list.filter((a) => !titleMatch(a.title, parsed.title) && !titleMatch(a.url, parsed.title) && !titleMatch(hostOf(a.url), parsed.title))
+        : [];
+      cleared += list.length - next.length;
+      patch.articles = next;
+    }
   }
 
   if (!specific && parsed.surfaces.length >= 5) {
@@ -417,6 +502,8 @@ async function applyClearCommand(
     habit: "Habits",
     goal: "Goals",
     reminder: "Reminders",
+    project: "Projects",
+    knowledge: "Knowledge",
   };
   const places = parsed.surfaces.map((s) => labels[s]).join(" and ");
   let reply: string;
@@ -460,7 +547,7 @@ async function applyClearCommand(
 function inferSurfaces(text: string, action: "add" | "clear" = "add"): PersonalSurface[] {
   const t = text.toLowerCase();
   if (action === "clear" && ALL_SECTIONS_RE.test(t) && !/\bmorning brief\b/.test(t)) {
-    return ["calendar", "task", "habit", "goal", "reminder"];
+    return ["calendar", "task", "habit", "goal", "reminder", "project", "knowledge"];
   }
   const out = new Set<PersonalSurface>();
   if (/\b(calendar|calander|calender|agenda)\b/.test(t) || /\bon my (day|calendar|calander|calender)\b/.test(t)) {
@@ -470,12 +557,18 @@ function inferSurfaces(text: string, action: "add" | "clear" = "add"): PersonalS
   if (/\bhabits?\b/.test(t)) out.add("habit");
   if (/\bgoals?\b/.test(t)) out.add("goal");
   if (/\bremind(er|ers| me)\b/.test(t)) out.add("reminder");
+  if (/\bprojects?\b/.test(t)) out.add("project");
+  if (looksLikeKnowledgeSave(t) || /\b(knowledge|reading list|saved (pages?|links?))\b/.test(t)) {
+    out.add("knowledge");
+  }
   if (
     action === "add" &&
     /\b(appointment|meeting|block|event)\b/.test(t) &&
     !out.has("habit") &&
     !out.has("goal") &&
-    !out.has("reminder")
+    !out.has("reminder") &&
+    !out.has("project") &&
+    !out.has("knowledge")
   ) {
     out.add("calendar");
   }
@@ -486,7 +579,17 @@ function inferSurfaces(text: string, action: "add" | "clear" = "add"): PersonalS
   if (action === "add" && out.has("calendar") && /\b(task|to-?do)\b/.test(t)) out.add("task");
   const dated =
     DATE_RE.test(t) || hasMonthDay(t) || /\bon the \d{1,2}(st|nd|rd|th)?\b/.test(t);
-  if (action === "add" && out.has("task") && dated && !out.has("habit") && !out.has("goal")) out.add("calendar");
+  if (
+    action === "add" &&
+    out.has("task") &&
+    dated &&
+    !out.has("habit") &&
+    !out.has("goal") &&
+    !out.has("project") &&
+    !out.has("knowledge")
+  ) {
+    out.add("calendar");
+  }
   return [...out];
 }
 
@@ -614,16 +717,18 @@ function addMinutes(
   };
 }
 
-function extractTitle(text: string): string {
+function extractTitle(text: string, url = ""): string {
   let t = text.trim();
+  if (url) t = t.replace(url, " ");
+  t = t.replace(/https?:\/\/[^\s]+/gi, " ");
   t = t.replace(/^(please |can you |could you |would you |jarvis[, ]+|hey jarvis[, ]+)/i, "");
   t = t.replace(/\b(clear|cleared|delete|remove|wipe|empty|reset|drop|get rid of)\b/gi, " ");
   t = t.replace(/\b(all of|all my|all the|all|everything|every section)\b/gi, " ");
   t = t.replace(/\b(the )?(whole )?(board|deck|dashboard|hub)\b/gi, " ");
   t = t.replace(/\bfrom\b/gi, " ");
-  t = t.replace(/\b(add|put|set|create|update|log|track|schedule|book|move|remember|remind me to|remind me|pencil|write)\b/gi, " ");
-  t = t.replace(/\b(calendar|calander|calender|agenda|tasks?|to-?dos?|habits?|goals?|reminders?)\b/gi, " ");
-  t = t.replace(/\b(with a|onto|into|on my|to my|for me|on the)\b/gi, " ");
+  t = t.replace(/\b(add|put|set|create|update|log|track|schedule|book|move|remember|remind me to|remind me|pencil|write|save|pin|file|store|keep|new)\b/gi, " ");
+  t = t.replace(/\b(calendar|calander|calender|agenda|tasks?|to-?dos?|habits?|goals?|reminders?|projects?|knowledge|articles?|reading list|links?|urls?|pages?)\b/gi, " ");
+  t = t.replace(/\b(with a|onto|into|on my|to my|for me|on the|called|named|titled|under|category|this|that|here|there)\b/gi, " ");
   t = t.replace(/\b(today|tonight|tomorrow|this week|next week)\b/gi, " ");
   t = t.replace(
     /\b(next |this )?(monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat|sunday|sun)\b/gi,
@@ -655,6 +760,46 @@ function inferGoalCategory(text: string): string {
   if (/\b(health|gym|fitness|workout|weight|sleep)\b/.test(t)) return "Health";
   if (/\b(creator|newsletter|audience|subscribers?)\b/.test(t)) return "Creator";
   return "Founder";
+}
+
+function inferProjectStatus(text: string): JarvisProject["status"] {
+  const t = text.toLowerCase();
+  if (/\b(upcoming|later|someday|pipeline)\b/.test(t)) return "upcoming";
+  if (/\b(done|finished|closed|complete)\b/.test(t)) return "done";
+  return "active";
+}
+
+function inferKnowledgeCategory(text: string): string {
+  const m = text.match(/\b(?:under|in|category)\s+([a-z][\w-]{1,24})\b/i);
+  if (m && !/^(the|my|our|knowledge|projects?|calendar|tasks?)$/i.test(m[1])) {
+    return m[1].charAt(0).toUpperCase() + m[1].slice(1);
+  }
+  return "Inbox";
+}
+
+export function extractUrl(text: string): string {
+  const abs = text.match(/https?:\/\/[^\s<>"']+/i);
+  if (abs) return abs[0].replace(/[.,;:)\]>]+$/, "");
+  const www = text.match(/\bwww\.[a-z0-9][-a-z0-9.]*\.[a-z]{2,}(?:\/[^\s]*)?/i);
+  if (www) return `https://${www[0].replace(/[.,;:)\]>]+$/, "")}`;
+  return "";
+}
+
+function looksLikeKnowledgeSave(text: string): boolean {
+  const t = text.toLowerCase();
+  if (/\b(knowledge|reading list|saved (pages?|links?)|knowledge base)\b/.test(t)) return true;
+  if (/\b(save|pin|file|store|keep)\b/.test(t) && (/\b(article|link|url|page)\b/.test(t) || Boolean(extractUrl(t)))) {
+    return true;
+  }
+  return false;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") || "Saved page";
+  } catch {
+    return url.replace(/^https?:\/\//, "").split("/")[0] || "Saved page";
+  }
 }
 
 function hasMonthDay(t: string): boolean {
@@ -705,6 +850,8 @@ function confirmReply(applied: AppliedPersonalUpdate, tz: string): string {
     habit: "Habits",
     goal: "Goals",
     reminder: "Reminders",
+    project: "Projects",
+    knowledge: "Knowledge",
   };
   const places = applied.surfaces.map((s) => labels[s]).join(" and ");
   if (applied.surfaces.length === 1 && applied.surfaces[0] === "habit") {
@@ -712,6 +859,12 @@ function confirmReply(applied: AppliedPersonalUpdate, tz: string): string {
   }
   if (applied.surfaces.length === 1 && applied.surfaces[0] === "goal") {
     return `Set the goal ${applied.title} on Goals. It will show on Morning Brief and Evening Wrap.`;
+  }
+  if (applied.surfaces.length === 1 && applied.surfaces[0] === "project") {
+    return `Opened ${applied.title} on Projects. It is on the dashboard and Morning Brief.`;
+  }
+  if (applied.surfaces.length === 1 && applied.surfaces[0] === "knowledge") {
+    return `Saved ${applied.title} to Knowledge. It is on the dashboard deck.`;
   }
   return `Done. ${applied.title} is on ${when} — ${places}. Morning Brief and Evening Wrap will include it.`;
 }

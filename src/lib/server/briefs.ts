@@ -164,6 +164,8 @@ export interface BriefFacts {
   calendar: string[];
   habits: string[];
   goals: string[];
+  projects: string[];
+  knowledge: string[];
 }
 
 export function collectBriefFacts(
@@ -230,6 +232,11 @@ export function collectBriefFacts(
     return `${marked ? "[x]" : "[ ]"} ${h.title} (${h.block})`;
   });
   const goals = (hub.goals ?? []).slice(0, 6).map((g) => `${g.title} (${g.progress}%, ${g.category})`);
+  const projects = (hub.projects ?? [])
+    .filter((p) => p.status !== "done")
+    .slice(0, 6)
+    .map((p) => p.title);
+  const knowledge = (hub.articles ?? []).slice(0, 4).map((a) => a.title);
 
   return {
     owner,
@@ -245,6 +252,8 @@ export function collectBriefFacts(
     calendar,
     habits,
     goals,
+    projects,
+    knowledge,
   };
 }
 
@@ -277,6 +286,8 @@ function factsToSections(kind: BriefKind, facts: BriefFacts): StoredBrief["secti
     ...facts.calendar.map((l) => `Calendar: ${l}`),
     ...personalHabitLines(facts),
     ...personalGoalLines(facts),
+    ...facts.projects.slice(0, 4).map((l) => `Project: ${l}`),
+    ...facts.knowledge.slice(0, 3).map((l) => `Saved: ${l}`),
   ].filter(Boolean);
   return {
     today: today.length ? today : ["Nothing on the board today."],
@@ -319,6 +330,8 @@ function snapshotText(facts: BriefFacts): string {
     facts.tomorrow.length ? `Tomorrow: ${facts.tomorrow.join("; ")}` : "Tomorrow: clear",
     facts.habits.length ? `Habits: ${facts.habits.join("; ")}` : "",
     facts.goals.length ? `Goals: ${facts.goals.join("; ")}` : "",
+    facts.projects.length ? `Projects: ${facts.projects.join("; ")}` : "",
+    facts.knowledge.length ? `Knowledge: ${facts.knowledge.join("; ")}` : "",
   ].filter(Boolean).join("\n");
 }
 
