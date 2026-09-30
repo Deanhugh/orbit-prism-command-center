@@ -25,7 +25,7 @@ export async function GET() {
   if (!user) return Response.json({ error: "unauthorized" }, { status: 401 });
   const cfg = loadAgentsConfig();
   return Response.json({
-    messages: readTodayChat(user.id),
+    messages: readTodayChat(user.id, user.username),
     provider: cfg.provider,
     providerLabel: PRESETS[cfg.provider]?.label || cfg.provider,
     model: cfg.model,
@@ -94,9 +94,9 @@ export async function POST(req: NextRequest) {
     return withSession(req, NextResponse.json({ error: "text required" }, { status: 400 }), user, minted);
   }
 
-  appendTodayLine(user.id, { role: "user", content: text });
+  appendTodayLine(user.id, { role: "user", content: text }, user.username);
   const { reply, applied } = await answerTodayChat(user.id, user.username, text, kind);
-  const saved = appendTodayLine(user.id, { role: "assistant", content: reply });
+  const saved = appendTodayLine(user.id, { role: "assistant", content: reply }, user.username);
   const hub = readHub(user.id, user.username);
 
   if (viaForm || (req.headers.get("accept") || "").includes("text/html")) {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     req,
     NextResponse.json({
       message: saved,
-      messages: readTodayChat(user.id),
+      messages: readTodayChat(user.id, user.username),
       applied,
       hub,
     }),

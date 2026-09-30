@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useJarvisHub } from "../useJarvisHub";
-import { greetingWord } from "@/lib/jarvis-data";
+import { greetingWord, resolveOwnerName } from "@/lib/jarvis-data";
 import { cn } from "@/lib/utils";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
@@ -19,7 +19,7 @@ export function BriefingApp({ username }: { username: string }) {
   const [stored, setStored] = useState<StoredBrief[]>([]);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Morning");
   const [running, setRunning] = useState(false);
-  const owner = hub?.profile.ownerName || (username.startsWith("guest-") ? "there" : username);
+  const owner = resolveOwnerName(hub?.profile.ownerName, username);
 
   useEffect(() => {
     fetch("/api/briefs")

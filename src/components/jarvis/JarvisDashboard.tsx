@@ -11,6 +11,7 @@ import {
   greetingWord,
   pickGreeting,
   isSameDay,
+  resolveOwnerName,
   startOfDay,
   type JarvisEvent,
   type JarvisTask,
@@ -55,7 +56,7 @@ export function JarvisDashboard({
       .catch(() => {});
   }, []);
 
-  const owner = hub?.profile.ownerName || prettyName(username);
+  const owner = resolveOwnerName(hub?.profile.ownerName, username);
   const greet = greetingWord(new Date(now));
   const progress = dayProgress(new Date(now));
 
@@ -363,11 +364,6 @@ function EventRow({ event, timeZone }: { event: JarvisEvent; timeZone?: string }
       </div>
     </div>
   );
-}
-
-function prettyName(username: string) {
-  if (username.startsWith("guest-")) return "there";
-  return username.charAt(0).toUpperCase() + username.slice(1);
 }
 
 function mergeTasks(

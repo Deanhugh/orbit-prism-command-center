@@ -132,14 +132,24 @@ export function TodayJarvis({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/jarvis/today-chat", { headers: { Accept: "application/json" } })
-      .then(async (res) => {
-        const data = (await res.json()) as { messages?: Line[] };
-        if (!cancelled && Array.isArray(data.messages)) setMessages(data.messages);
-      })
-      .catch(() => {});
+    function load() {
+      fetch("/api/jarvis/today-chat", { headers: { Accept: "application/json" } })
+        .then(async (res) => {
+          const data = (await res.json()) as { messages?: Line[] };
+          if (!cancelled && Array.isArray(data.messages)) setMessages(data.messages);
+        })
+        .catch(() => {});
+    }
+    load();
+    const id = window.setInterval(load, 60_000);
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
     return () => {
       cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
     };
   }, []);
 

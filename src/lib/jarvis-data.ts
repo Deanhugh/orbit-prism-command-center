@@ -207,13 +207,25 @@ function day(offset: number, hour = 9, minute = 0): number {
   return d.getTime();
 }
 
+export const OWNER_FIRST_NAME = "Howard";
+
+/** First name Jarvis uses in Today, briefs, and greetings. Login can stay `operator`. */
+export function resolveOwnerName(ownerName?: string, username?: string): string {
+  const named = (ownerName || "").trim();
+  if (named && !/^operator$/i.test(named)) return named;
+  const user = (username || "").trim();
+  if (user && !/^operator$/i.test(user) && !/^guest-/i.test(user)) {
+    const pretty = user.replace(/[_-]+/g, " ");
+    return pretty.charAt(0).toUpperCase() + pretty.slice(1);
+  }
+  return OWNER_FIRST_NAME;
+}
+
 export function defaultProfile(username: string): JarvisProfile {
-  const owner = username.replace(/^guest-.*/i, "there").replace(/[_-]+/g, " ");
-  const pretty = owner.charAt(0).toUpperCase() + owner.slice(1);
   return {
     displayName: "Orbit Prism Command Center",
     shortName: "Orbit Prism",
-    ownerName: pretty === "There" ? "there" : pretty,
+    ownerName: resolveOwnerName(undefined, username),
     tagline: "Your whole operation, one dashboard",
     timezone: "America/New_York",
     logoUrl: "/profile.png",
