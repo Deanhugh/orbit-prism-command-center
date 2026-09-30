@@ -6,7 +6,7 @@ https://command-center-production-e72e.up.railway.app/
 
 Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
 
-The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Top nav: **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**. There is no Email / Mautic item in nav.
+The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. The **top-right** nav is **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**. There is no Email / Mautic item in nav. The Agents Office **top-left** column shows only the **Orbit Prism Operating System Command Center** wordmark (Jarvis / Agents pills live in the top-right, not beside the logo).
 
 What landed in this stack:
 
@@ -17,6 +17,7 @@ What landed in this stack:
 - **Jarvis Today** — spoken/typed chat that can dispatch office work
 - **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
 - **CAD** (`/cad`) and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
+- **Agents Office** — three-pane floor (desks, chat, artifact downloads); top-left wordmark only; chat-pill model list hides Demo
 
 ## Run locally
 
@@ -225,9 +226,9 @@ The Jarvis home (`/jarvis`) chat — typed or spoken — is **Today**: brief, wh
 
 **Voice:** Morning Brief, Evening Wrap, and Today speak through a [Fish Audio](https://fish.audio/) library voice, not the browser’s default system voice. Open **Settings → Voice** (`/jarvis/settings?tab=voice`). Paste `FISH_API_KEY` (or set the same name on Railway), pick a public library voice (default is **JARVIS**), and Preview. Default model is `s2.1-pro-free` (Fish’s free developer tier). `s2.1-pro` needs [API credit](https://fish.audio/app/developers) — that wallet is separate from Fish website credit. If paid TTS returns insufficient credit, Command Center retries `s2.1-pro-free`. If Fish is down or still refuses, browser `speechSynthesis` runs and Settings shows the Fish error. This is a REST TTS call (`POST /api/jarvis/voice/speak`) — not an MCP connector.
 
-**Agents Office** (`/agents`) is a three-pane floor: desks + 3D office on the left, chat in the middle, and an **artifact pane** on the right when a desk produces a document or video. Preview the result and download **PDF**, **Word** (`.doc`), **Excel** (`.csv`), **Presentation** (HTML slides), or **Video** (when the reply includes a video URL from Studio / Krea / Higgsfield). Click **Open in pane** on a long assistant reply to preview it even if you did not ask for a file.
+**Agents Office** (`/agents`) is a three-pane floor: desks + 3D office on the left, chat in the middle, and an **artifact pane** on the right when a desk produces a document or video. The left column header is the **Orbit Prism Operating System Command Center** logo only — Jarvis and Agents are in the top-right nav, not next to the wordmark. Preview a result and download **PDF**, **Word** (`.doc`), **Excel** (`.csv`), **Presentation** (HTML slides), or **Video** (when the reply includes a video URL from Studio / Krea / Higgsfield). Click **Open in pane** on a long assistant reply to preview it even if you did not ask for a file.
 
-The **chat pill** keeps the desk model picker on the **right** (next to Send). Chat / Task / Plan sits on the left after `+`. Type `/clear`, `/task`, `/plan`, `/chat`, or `/help`; type `@` to attach a Brain note. Stats under the pill show turns, tool steps, tok/s, tokens, and cache hit % — live usage when the model returns it (OpenRouter / OpenAI-style), otherwise an estimate and cache 0%. Each desk thread can still be wiped: say **clear the chat history** or use **Clear Chat** outside the pill. Settings are unchanged.
+The **chat pill** keeps the desk model picker on the **right** (next to Send). The picker lists live models only — it never shows **Demo**. Chat / Task / Plan sits on the left after `+`. Type `/clear`, `/task`, `/plan`, `/chat`, or `/help`; type `@` to attach a Brain note. Stats under the pill show turns, tool steps, tok/s, tokens, and cache hit % — live usage when the model returns it (OpenRouter / OpenAI-style), otherwise an estimate and cache 0%. Each desk thread can still be wiped: say **clear the chat history** or use **Clear Chat** outside the pill. Settings are unchanged. The Demo provider remains in **Settings → Providers** as the offline fallback; the office header **Offline / Live** badge is separate from the pill.
 
 The **+** menu on a desk ticket attaches a Brain note or a local file, and can open Browse MCP without leaving the floor.
 

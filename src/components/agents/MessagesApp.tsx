@@ -12,7 +12,6 @@ import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
 import { useSpaceToTalk, useVoice } from "@/lib/use-voice";
 import { HeaderControls } from "@/components/chrome/HeaderControls";
-import { PageNav } from "@/components/chrome/PageNav";
 import { BrainGraphOverlay } from "@/components/chrome/BrainGraphOverlay";
 import { Brand } from "@/components/chrome/Brand";
 import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
@@ -21,7 +20,7 @@ import { ChatPill } from "@/components/agents/ChatPill";
 import { ArtifactPane } from "@/components/agents/ArtifactPane";
 import { accountHandle, cn, timeAgo } from "@/lib/utils";
 import { looksLikeClearChat } from "@/lib/clear-chat";
-import { parseSlash, type SlashCmd } from "@/lib/chat-commands";
+import { isDemoChoice, parseSlash, type SlashCmd } from "@/lib/chat-commands";
 import { estimateTokens, extractVideoUrl, inferArtifactKind, titleFromMarkdown, type ArtifactMeta } from "@/lib/artifacts";
 
 // The animated 3D office scene (client-only), embedded compactly under the agents list.
@@ -189,14 +188,20 @@ export function MessagesApp({ username }: { username: string }) {
     const rows: { provider: string; model: string }[] = [];
     const seen = new Set<string>();
     for (const p of providers) {
+      if (isDemoChoice(p.id, "")) continue;
       for (const m of modelsByProvider[p.id] || []) {
+        if (isDemoChoice(p.id, m)) continue;
         const key = `${p.id}:${m}`;
         if (seen.has(key)) continue;
         seen.add(key);
         rows.push({ provider: p.id, model: m });
       }
     }
-    if (current.model && !rows.some((r) => r.model === current.model && r.provider === current.provider)) {
+    if (
+      current.model &&
+      !isDemoChoice(current.provider, current.model) &&
+      !rows.some((r) => r.model === current.model && r.provider === current.provider)
+    ) {
       rows.unshift({ provider: current.provider, model: current.model });
     }
     return rows;
@@ -486,9 +491,8 @@ export function MessagesApp({ username }: { username: string }) {
       {/* left: Agents list (top) + animated Office scene (bottom) */}
       <aside className="flex h-[70vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[300px] lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-2 px-4 py-3">
-          <Brand />
-          <PageNav pairOnly />
-          <Link href="/jarvis/settings?tab=mcp" className="ml-auto grid h-6 w-6 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
+          <Brand size="office" tone="dark" />
+          <Link href="/jarvis/settings?tab=mcp" className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
             <Plus size={13} />
           </Link>
         </div>
