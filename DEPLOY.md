@@ -31,6 +31,7 @@ Keep it running so routines fire on schedule (`pm2` or `launchd`). Local Ollama 
    | Variable | Required | Purpose |
    |---|---|---|
    | `ORBIT_SECRET` | yes | Signs login cookies. Generate a long random string and keep it. |
+   | `ORBIT_PUBLIC_URL` | yes on Railway | Public origin. Production is `https://app.orbitprism.com`. |
    | `DATA_DIR` | no | Defaults to `/app/data` in the image. |
    | `ORBIT_BRAIN` | no | Defaults to `./brain` if unset. |
    | `OLLAMA_API_KEY` | for Ollama Cloud | Pair with base URL `https://ollama.com/v1` in Settings. |
@@ -50,6 +51,21 @@ Keep it running so routines fire on schedule (`pm2` or `launchd`). Local Ollama 
 
 6. Deploy. Every push to the connected branch redeploys.
 
+### Custom domain (`app.orbitprism.com`)
+
+Keep **www.orbitprism.com** on Vercel. Attach **app.orbitprism.com** as a custom domain on the Railway **command-center** production service (already done). Set `ORBIT_PUBLIC_URL=https://app.orbitprism.com`.
+
+In Vercel DNS for **orbitprism.com**:
+
+| Type | Name | Value |
+| --- | --- | --- |
+| CNAME | `app` | `x8pcmht8.up.railway.app` |
+| TXT | `_railway-verify.app` | `railway-verify=49d334637ade72266d4e014b2757bcf580e7e9e86c30557cb0484be9a4d196f1` |
+
+Do not move the apex or `www` to Railway. Point the marketing footer **Login** to `https://app.orbitprism.com/login`. Attaching a domain you already own is free on Railway; buying a new domain *through* Railway is a separate fee.
+
+Until DNS is live, open https://command-center-production-e72e.up.railway.app/
+
 ### Cloud constraints
 
 - Railway **cannot** reach `http://127.0.0.1:11434` on your Mac. Use Ollama Cloud, or expose Ollama
@@ -60,5 +76,6 @@ Keep it running so routines fire on schedule (`pm2` or `launchd`). Local Ollama 
 
 ## First login on Railway
 
-Open the Railway URL → lock screen. The first visit sets the machine password (6+ characters) as
-user `operator`, unless you already created an account in Settings.
+Open https://app.orbitprism.com/login (or the Railway fallback URL) → lock screen. The first visit
+sets the machine password (6+ characters) as user `operator`, unless you already created an account
+in Settings.

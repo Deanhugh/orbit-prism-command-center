@@ -2,7 +2,11 @@
 
 Jarvis / Command Center for Orbit Prism. Live:
 
-https://command-center-production-e72e.up.railway.app/
+https://app.orbitprism.com/
+
+Login: https://app.orbitprism.com/login
+
+Railway fallback (works before DNS is live): https://command-center-production-e72e.up.railway.app/
 
 Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
 
@@ -22,6 +26,7 @@ What landed in this stack:
 - **Office page lockup** — Marketing, Studio, Sales, PMO, CAD, Finance, and Vault use the full Orbit Prism Command Center mark in the top-left (header is taller so it fits)
 - **OpenRouter favorites** — Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router at the top of the Agents picker and Settings
 - **Jev 1.13** — TypeSafe decision model on the same OpenRouter key: picks the desk for Jarvis-routed work and gates agent tool calls; the chat LLM still writes the reply
+- **Custom domain** — `app.orbitprism.com` on Railway; `www.orbitprism.com` stays on Vercel. Footer Login on the marketing site should open `https://app.orbitprism.com/login`
 
 ## Run locally
 
@@ -37,7 +42,7 @@ Open http://127.0.0.1:43140 — default port is `43140`.
 Yes. ChatGPT models connect in **Settings → Providers** with an OpenAI API key. Claude in that same list is **Claude Code (the CLI on the machine)**, not an Anthropic API-key field.
 
 Providers page:
-https://command-center-production-e72e.up.railway.app/jarvis/settings?tab=providers
+https://app.orbitprism.com/jarvis/settings?tab=providers
 
 Keys pasted in Settings are stored in `data/secrets.json` on the host (gitignored), or you can set the same names as Railway / env variables.
 
@@ -101,7 +106,7 @@ Gemini **1.5** Pro/Flash are retired on OpenRouter — do not paste `google/gemi
 Skills are markdown playbooks the Command Center injects into an agent’s prompt. They are **not** Ollama models. Ollama (or Claude / ChatGPT) is the brain. A skill is the written method that agent should follow.
 
 List and add them at **Settings → Skills**:
-https://command-center-production-e72e.up.railway.app/jarvis/settings?tab=skills
+https://app.orbitprism.com/jarvis/settings?tab=skills
 
 ### GitHub folder
 
@@ -272,7 +277,7 @@ These are separate Railway projects. Command Center talks to them over HTTP with
 - App: https://server-production-6c63.up.railway.app
 - Workspace: **Orbit Prism**
 - Command Center vars: `TWENTY_API_URL`, `TWENTY_APP_URL`, `TWENTY_API_KEY`
-- Sales board: https://command-center-production-e72e.up.railway.app/sales
+- Sales board: https://app.orbitprism.com/sales
 
 Sign into Twenty, then open `/sales`. The board is **live** (not mock) when those three variables are set and `/api/crm/config` reports `reachable: true`. Create or rotate the key in Twenty → Settings → API & Webhooks (key name **Command Center**). Social CRM (`/jarvis/crm`) starts empty — sample Twenty contacts are wiped once on read and the local mock no longer reseeds Amara/Wei/Elena rows.
 
@@ -287,7 +292,7 @@ Command Center vars: `BIGCAPITAL_API_URL`, `BIGCAPITAL_APP_URL`, `BIGCAPITAL_API
 - App: https://plane-production-3665.up.railway.app/orbit-prism/
 - Workspace slug: `orbit-prism`
 - Command Center vars: `PLANE_API_URL`, `PLANE_APP_URL`, `PLANE_WORKSPACE_SLUG`, `PLANE_API_KEY`
-- PMO board: https://command-center-production-e72e.up.railway.app/pmo
+- PMO board: https://app.orbitprism.com/pmo
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
@@ -295,7 +300,7 @@ Command Center vars: `BIGCAPITAL_API_URL`, `BIGCAPITAL_APP_URL`, `BIGCAPITAL_API
 
 Orbit-native engineering studio. Left: prompt + engineering-agent build log. Right: Three.js viewport that fills in as solids are placed. This is **not** a vendored CAD kernel (CascadeStudio / Zoo Design Studio / Cursor). Agents emit a box-solid model the browser can mesh.
 
-- Page: https://command-center-production-e72e.up.railway.app/cad
+- Page: https://app.orbitprism.com/cad
 - Agents: Engineering (`op_lead`, `op_intel`, `op_legal`, `op_comply`, `op_dash`) have the `cad` tool (`cad_build`, `cad_list`, `cad_get`)
 - Named bodies: Hilbert cube infill, L-bracket, enclosure, mounting plate, flange, shaft. Other prompts get a small parametric stand-in.
 - Models persist in `data/cad-models.json` on the host volume.
@@ -306,7 +311,7 @@ Prompt on the page yourself, or assign an Engineering task that mentions CAD / b
 
 Studio is a working page inside Command Center. Sign in, then open:
 
-https://command-center-production-e72e.up.railway.app/studio
+https://app.orbitprism.com/studio
 
 Prompt a film yourself, or pick **Product film / Explainer / Trailer / Reel**. Brand, Content, and Social agents write the cut on the left; the right side plays the shot list. Play, pause, and the timeline work. Productions persist in `data/studio-productions.json` on the host volume.
 
@@ -318,7 +323,7 @@ This is **not** OpenMontage and it does **not** render a finished MP4. There is 
 
 ### Vault — `/vault` (3D brain)
 
-https://command-center-production-e72e.up.railway.app/vault
+https://app.orbitprism.com/vault
 
 The Vault is a 3D graph of every file in the office brain (Markdown with `[[wiki links]]`, plus images and PDFs). Search, filter by category, and open a note. Agents retrieve relevant notes before a live task.
 
@@ -330,6 +335,27 @@ The Vault is a 3D graph of every file in the office brain (Markdown with `[[wiki
 
 Railway project **Orbit Prism TryPost** exists (app + Postgres + Redis). `ghcr.io/trypostit/trypost:latest` and `v1.0.8` crash on boot (`Laravel\\Pail\\PailServiceProvider` not found). Leave `/marketing` on mock until a working image is published. Then set `TRYPOST_API_URL`, `TRYPOST_APP_URL`, `TRYPOST_API_KEY`.
 
+## Custom domain
+
+Command Center is attached on Railway as **app.orbitprism.com**. The marketing site **www.orbitprism.com** stays on Vercel — do not point the apex or `www` at Railway.
+
+`ORBIT_PUBLIC_URL` on the command-center production service is `https://app.orbitprism.com`.
+
+### Vercel DNS (orbitprism.com)
+
+In the Vercel project that owns **orbitprism.com**, add these records. Until they exist, `https://app.orbitprism.com` will not resolve — use the Railway fallback URL.
+
+| Type | Name | Value |
+| --- | --- | --- |
+| CNAME | `app` | `x8pcmht8.up.railway.app` |
+| TXT | `_railway-verify.app` | `railway-verify=49d334637ade72266d4e014b2757bcf580e7e9e86c30557cb0484be9a4d196f1` |
+
+Do not proxy or flatten the CNAME. Railway issues TLS after the ownership TXT is visible (retries up to 72 hours). If the certificate is still validating after the records propagate, retry the certificate from the Railway domain panel.
+
+### Footer Login on www.orbitprism.com
+
+Point the marketing site footer **Login** to `https://app.orbitprism.com/login`. Leave `www` and the apex on Vercel.
+
 ## Deploy
 
 Railway builds Command Center from the GitHub branch connected to the **command-center** service. Persistent data uses the `orbit-data` volume at `/app/data`. Full host notes: [`DEPLOY.md`](DEPLOY.md).
@@ -340,6 +366,7 @@ Optional MCP tokens (same names as Settings → MCP) if you prefer env over the 
 
 | Variable | App |
 | --- | --- |
+| `ORBIT_PUBLIC_URL` | Public origin (`https://app.orbitprism.com`) |
 | `OPENROUTER_API_KEY` | Live LLM |
 | `NOTION_TOKEN` / `NOTION_API_KEY` | Notion |
 | `APIFY_TOKEN` | Apify scrape |
@@ -350,4 +377,4 @@ Optional MCP tokens (same names as Settings → MCP) if you prefer env over the 
 
 OAuth and pasted tokens also land in `/app/data/secrets.json`. Custom connectors persist in `/app/data/connectors.json`. Routines persist in `/app/data/routines.json`. CAD and Studio files are `cad-models.json` and `studio-productions.json` on the same volume.
 
-OAuth callback the vendor must allow: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`.
+OAuth callback the vendor must allow: `https://app.orbitprism.com/api/settings/connectors/oauth/callback` (Railway fallback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`).
