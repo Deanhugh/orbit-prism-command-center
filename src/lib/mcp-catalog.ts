@@ -33,6 +33,16 @@ export const MCP_CATALOG: McpCatalogItem[] = [
     hint: "Connect with Krea (OAuth) or paste KREA_API_TOKEN from krea.ai/app/api/tokens. Use https://api.krea.ai/mcp (the page at www.krea.ai/mcp is the setup guide). Runs use your Krea workspace.",
   },
   {
+    id: "higgsfield",
+    name: "Higgsfield",
+    description: "Generate images, video, characters, and audio with Higgsfield — live remote MCP on Railway",
+    command: "https://mcp.higgsfield.ai/mcp",
+    transport: "http",
+    remote: true,
+    auth: "oauth",
+    hint: "Connect with Higgsfield (OAuth only — no API key). Uses your higgsfield.ai credits. URL: https://mcp.higgsfield.ai/mcp.",
+  },
+  {
     id: "apify",
     name: "Apify",
     description: "Scrape websites and social media via Apify Store Actors — live remote MCP on Railway",

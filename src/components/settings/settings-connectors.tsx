@@ -100,8 +100,10 @@ export function Connectors() {
   const notion = data?.connectors.find((c) => c.key === "notion");
   const apify = data?.connectors.find((c) => c.key === "apify");
   const krea = data?.connectors.find((c) => c.key === "krea" || c.key === "kreaai");
+  const higgsfield = data?.connectors.find((c) => c.key === "higgsfield" || c.key === "higgsfeild");
   const apifyUrl = MCP_CATALOG.find((i) => i.id === "apify")?.command || "https://mcp.apify.com";
   const kreaUrl = MCP_CATALOG.find((i) => i.id === "krea")?.command || "https://api.krea.ai/mcp";
+  const higgsfieldUrl = MCP_CATALOG.find((i) => i.id === "higgsfield")?.command || "https://mcp.higgsfield.ai/mcp";
 
   return (
     <div className="space-y-3">
@@ -136,11 +138,16 @@ export function Connectors() {
         url={kreaUrl}
         onSaved={load}
       />
+      <HiggsfieldPanel
+        row={higgsfield}
+        url={higgsfieldUrl}
+        onSaved={load}
+      />
 
       <section id="browse-mcp" className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Browse MCP</h2>
         <p className="mb-3 text-[11px] text-ink-soft">
-          Remote apps (Notion, Apify, Krea, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
+          Remote apps (Notion, Apify, Krea, Higgsfield, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
         </p>
         <McpBrowse
           catalog={data?.catalog || []}
@@ -252,6 +259,27 @@ function KreaPanel({ row, url, onSaved }: { row?: ConnRow; url: string; onSaved:
   );
 }
 
+function HiggsfieldPanel({ row, url, onSaved }: { row?: ConnRow; url: string; onSaved: () => void }) {
+  const live = row?.status === "connected";
+  return (
+    <section className="rounded-lg border border-line bg-panel p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : "bg-finance")} />
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Higgsfield — live remote MCP</h2>
+        <span className="text-[10px] text-ink-soft">{row?.reason || "Not connected yet"}</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+        Agents generate images, video, Soul characters, and audio through Higgsfield. Same connection type as Notion:
+        Streamable HTTP at <code className="text-ink">https://mcp.higgsfield.ai/mcp</code> + OAuth. Higgsfield MCP does
+        not use an API key — sign in at{" "}
+        <a className="underline" href="https://higgsfield.ai" target="_blank" rel="noreferrer">higgsfield.ai</a>
+        {" "}via Connect with OAuth. Jobs use your Higgsfield plan credits (MCP is not the unlimited web allowance).
+      </p>
+      <AuthActions name="Higgsfield" url={url} auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} oauthOnly />
+    </section>
+  );
+}
+
 function AuthActions({
   name,
   url,
@@ -259,6 +287,7 @@ function AuthActions({
   onSaved,
   hasToken,
   placeholder,
+  oauthOnly,
 }: {
   name: string;
   url?: string;
@@ -266,6 +295,7 @@ function AuthActions({
   onSaved: () => void;
   hasToken?: boolean;
   placeholder?: string;
+  oauthOnly?: boolean;
 }) {
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -305,6 +335,7 @@ function AuthActions({
 
   return (
     <div className="mt-3 space-y-2">
+      {oauthOnly ? null : (
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <input
           type="password"
@@ -322,6 +353,7 @@ function AuthActions({
           {busy === "save" ? "Saving…" : "Save token"}
         </button>
       </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <a
           href={oauthHref}
