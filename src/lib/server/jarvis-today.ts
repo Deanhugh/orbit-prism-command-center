@@ -4,7 +4,7 @@ import { dataDir, loadConfig } from "./config";
 import { readHub } from "./jarvis-hub";
 import { JARVIS } from "../office-data";
 import { shortId } from "../utils";
-import { seedHabits, type JarvisHub } from "../jarvis-data";
+import { type JarvisHub } from "../jarvis-data";
 import { composeBrief } from "./briefs";
 import { applyPersonalCommand, looksLikePersonalUpdate, type AppliedPersonalUpdate } from "./jarvis-commands";
 import { DEFAULT_TZ, formatClockInZone, isSameDayInZone } from "./zone";
@@ -59,7 +59,7 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
   const tz = hub.profile.timezone || DEFAULT_TZ;
   const clock = (ts: number) => formatClockInZone(ts, tz);
   const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
-  const habits = [...(hub.suppressSeeds?.habits ? [] : seedHabits()), ...(hub.extraHabits ?? [])];
+  const habits = [...(hub.extraHabits ?? [])];
   const done = new Set(hub.habitsDone ?? []);
   const todayEvents = events.filter((e) => isSameDayInZone(e.start, now, tz));
   const laterEvents = events.filter((e) => e.start > now).slice(0, 5);

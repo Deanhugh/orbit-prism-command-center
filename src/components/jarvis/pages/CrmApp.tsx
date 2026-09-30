@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { defaultCrmTaxonomy, seedContacts, type JarvisContact } from "@/lib/jarvis-data";
+import { defaultCrmTaxonomy, type JarvisContact } from "@/lib/jarvis-data";
 import { cn } from "@/lib/utils";
 import { useJarvisHub } from "../useJarvisHub";
 
@@ -134,19 +134,15 @@ function Stat({ label, value }: { label: string; value: number }) {
 }
 
 function mergeContacts(people: Person[]): JarvisContact[] {
-  const seed = seedContacts();
-  const extras: JarvisContact[] = people
-    .filter((p) => !seed.some((s) => s.email && p.email && s.email === p.email))
-    .map((p) => ({
-      id: p.id,
-      name: `${p.firstName} ${p.lastName}`.trim(),
-      email: p.email || "",
-      label: "new-lead",
-      category: "Lead",
-      status: "Active",
-      lastEngagement: Date.now() - 86400000,
-    }));
-  return [...seed, ...extras];
+  return people.map((p) => ({
+    id: p.id,
+    name: `${p.firstName} ${p.lastName}`.trim(),
+    email: p.email || "",
+    label: "new-lead",
+    category: "Lead",
+    status: "Active",
+    lastEngagement: Date.now() - 86400000,
+  }));
 }
 
 function labelTone(label: string) {

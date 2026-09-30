@@ -169,7 +169,7 @@ export function collectBriefFacts(
     .sort((a, b) => a.start - b.start)
     .map((e) => `${clock(e.start)} ${e.title}${e.with ? ` with ${e.with}` : ""}`);
   const extraHabits = hub.extraHabits ?? [];
-  const habits = [...(hub.suppressSeeds?.habits ? [] : seedHabits()), ...extraHabits].map((h) => {
+  const habits = extraHabits.map((h) => {
     const marked = (hub.habitsDone ?? []).includes(h.id);
     return `${marked ? "[x]" : "[ ]"} ${h.title} (${h.block})`;
   });
