@@ -15,6 +15,7 @@ import {
   readTodayChat,
   resolveTodayPrompt,
 } from "@/lib/server/jarvis-today";
+import { readHub } from "@/lib/server/jarvis-hub";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,8 +95,9 @@ export async function POST(req: NextRequest) {
   }
 
   appendTodayLine(user.id, { role: "user", content: text });
-  const content = await answerTodayChat(user.id, user.username, text, kind);
-  const saved = appendTodayLine(user.id, { role: "assistant", content });
+  const { reply, applied } = await answerTodayChat(user.id, user.username, text, kind);
+  const saved = appendTodayLine(user.id, { role: "assistant", content: reply });
+  const hub = readHub(user.id, user.username);
 
   if (viaForm || (req.headers.get("accept") || "").includes("text/html")) {
     return withSession(req, redirectTo("/jarvis#today-jarvis"), user, minted);
@@ -103,7 +105,12 @@ export async function POST(req: NextRequest) {
 
   return withSession(
     req,
-    NextResponse.json({ message: saved, messages: readTodayChat(user.id) }),
+    NextResponse.json({
+      message: saved,
+      messages: readTodayChat(user.id),
+      applied,
+      hub,
+    }),
     user,
     minted,
   );

@@ -98,6 +98,40 @@ export function dateKeyInZone(timeZone: string, utcMs = Date.now()): string {
   return partsInZone(timeZone || DEFAULT_TZ, utcMs).date;
 }
 
+export function addDaysInZone(timeZone: string, utcMs: number, days: number): number {
+  const tz = timeZone || DEFAULT_TZ;
+  const p = partsInZone(tz, utcMs);
+  const n = addCalendarDays(p.year, p.month, p.day, days);
+  return zonedWallToUtc(tz, n.year, n.month, n.day, p.hour, p.minute);
+}
+
+export function startOfDayInZone(timeZone: string, utcMs = Date.now()): number {
+  const tz = timeZone || DEFAULT_TZ;
+  const p = partsInZone(tz, utcMs);
+  return zonedWallToUtc(tz, p.year, p.month, p.day, 0, 0);
+}
+
+export function isSameDayInZone(a: number, b: number, timeZone: string): boolean {
+  return dateKeyInZone(timeZone, a) === dateKeyInZone(timeZone, b);
+}
+
+export function formatClockInZone(ts: number, timeZone: string): string {
+  return new Date(ts).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: timeZone || DEFAULT_TZ,
+  });
+}
+
+export function formatWeekdayInZone(ts: number, timeZone: string): string {
+  return new Date(ts).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: timeZone || DEFAULT_TZ,
+  });
+}
+
 /** Next occurrence of hour:minute in the timezone, optionally filtered by weekday. */
 export function nextAtInZone(
   hour: number,

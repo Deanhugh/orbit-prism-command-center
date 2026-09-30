@@ -143,6 +143,8 @@ export interface JarvisHub {
   notes: JarvisNote[];
   proposals: JarvisProposal[];
   extraEvents: JarvisEvent[];
+  extraTasks: JarvisTask[];
+  extraHabits: JarvisHabit[];
   goals: JarvisGoal[];
   reminders: JarvisReminder[];
   replies: JarvisReply[];
@@ -527,6 +529,8 @@ export function emptyHub(username: string): JarvisHub {
     notes: seedNotes(),
     proposals: seedProposals(),
     extraEvents: [],
+    extraTasks: [],
+    extraHabits: [],
     goals: seedGoals(),
     reminders: seedReminders(),
     replies: seedReplies(),
@@ -602,8 +606,12 @@ export function formatWhen(ts: number): string {
   });
 }
 
-export function formatClockHM(ts = Date.now()): string {
-  return new Date(ts).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+export function formatClockHM(ts = Date.now(), timeZone?: string): string {
+  return new Date(ts).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  });
 }
 
 export function formatDayHead(ts: number): string {

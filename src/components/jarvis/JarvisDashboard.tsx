@@ -62,12 +62,18 @@ export function JarvisDashboard({
   const greet = greetingWord(new Date(now));
   const progress = dayProgress(new Date(now));
 
-  const tasks = useMemo(() => mergeTasks(officeTasks), [officeTasks]);
+  const tasks = useMemo(
+    () => mergeTasks(officeTasks, hub?.extraTasks ?? []),
+    [officeTasks, hub?.extraTasks],
+  );
   const events = useMemo(
     () => [...seedEvents(), ...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
     [hub?.extraEvents],
   );
-  const habits = seedHabits();
+  const habits = useMemo(
+    () => [...seedHabits(), ...(hub?.extraHabits ?? [])],
+    [hub?.extraHabits],
+  );
   const done = new Set(hub?.habitsDone ?? []);
 
   const filtered = tasks.filter((t) => {
@@ -181,12 +187,12 @@ export function JarvisDashboard({
           </Link>
         </div>
         <ul className="mt-3 flex-1 space-y-3 overflow-y-auto thin-scroll">
-          {groupEvents(events.slice(0, 8)).map(([day, items]) => (
+          {groupEvents(events.slice(0, 8), hub?.profile.timezone).map(([day, items]) => (
             <li key={day}>
               <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-soft">{day}</p>
               <ul className="mt-1.5 space-y-2">
                 {items.map((e) => (
-                  <EventRow key={e.id} event={e} />
+                  <EventRow key={e.id} event={e} timeZone={hub?.profile.timezone} />
                 ))}
               </ul>
             </li>
@@ -348,13 +354,13 @@ function HabitBlock({
   );
 }
 
-function EventRow({ event }: { event: JarvisEvent }) {
+function EventRow({ event, timeZone }: { event: JarvisEvent; timeZone?: string }) {
   return (
     <div className="flex items-start justify-between gap-2 text-[12px]">
       <div className="min-w-0">
         <p className="truncate">{event.title}</p>
         <p className="text-[10px] text-ink-soft">
-          {formatClockHM(event.start)}
+          {formatClockHM(event.start, timeZone)}
           {event.with ? ` · ${event.with}` : ""}
         </p>
       </div>
@@ -369,16 +375,25 @@ function prettyName(username: string) {
 
 function mergeTasks(
   office: { id: string; title: string; status: string; progress: number; updatedAt: number }[],
+  extras: JarvisTask[] = [],
 ): JarvisTask[] {
-  return office.slice(0, 12).map((t) => ({
+  const personal = extras.map((t) => ({ ...t, project: t.project || "Personal" }));
+  const desk = office.slice(0, 12).map((t) => ({
     id: t.id,
     title: t.title,
     project: "Office",
     due: t.updatedAt || Date.now(),
     progress: t.progress,
-    status: t.status === "done" ? "done" : t.status === "in_progress" ? "in_progress" : t.status === "waiting_approval" ? "waiting" : "todo",
+    status: (t.status === "done"
+      ? "done"
+      : t.status === "in_progress"
+        ? "in_progress"
+        : t.status === "waiting_approval"
+          ? "waiting"
+          : "todo") as JarvisTask["status"],
     priority: "normal" as const,
   }));
+  return [...personal, ...desk];
 }
 
 function groupByProject(tasks: JarvisTask[]): [string, JarvisTask[]][] {
@@ -395,13 +410,14 @@ function avgProgress(items: JarvisTask[]) {
   return Math.round(items.reduce((s, t) => s + t.progress, 0) / items.length);
 }
 
-function groupEvents(events: JarvisEvent[]): [string, JarvisEvent[]][] {
+function groupEvents(events: JarvisEvent[], timeZone?: string): [string, JarvisEvent[]][] {
   const map = new Map<string, JarvisEvent[]>();
   for (const e of events) {
     const key = new Date(e.start).toLocaleDateString("en-US", {
       weekday: "long",
       month: "short",
       day: "numeric",
+      ...(timeZone ? { timeZone } : {}),
     }).toUpperCase();
     map.set(key, [...(map.get(key) || []), e]);
   }

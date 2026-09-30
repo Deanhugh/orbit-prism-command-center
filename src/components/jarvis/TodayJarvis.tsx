@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import { useVoice } from "@/lib/use-voice";
 import { jarvisSpeechSupported, primeJarvisSpeech, speakJarvis, stopJarvisSpeech } from "@/lib/speak-jarvis";
 import { JarvisCore, type JarvisMood } from "./JarvisCore";
+import { notifyHubChanged } from "@/lib/jarvis-events";
+import type { JarvisHub } from "@/lib/jarvis-data";
 
 interface Line {
   id: string;
@@ -100,10 +102,11 @@ export function TodayJarvis({
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(preset ? { preset } : { text }),
       });
-      const data = (await res.json()) as { messages?: Line[]; error?: string };
+      const data = (await res.json()) as { messages?: Line[]; error?: string; hub?: JarvisHub };
       if (!res.ok) throw new Error(data.error || "Jarvis could not take that.");
       const next = data.messages || [];
       setMessages(next);
+      if (data.hub) notifyHubChanged(data.hub);
       const last = next.filter((l) => l.role === "assistant").at(-1);
       if (last && voiceOutRef.current) {
         speakJarvis(last.content, {
@@ -189,8 +192,8 @@ export function TodayJarvis({
         <div className="mt-4 min-h-[72px] max-h-[120px] flex-1 space-y-2 overflow-y-auto border-t border-line/70 pt-3 thin-scroll pr-1">
           {messages.length === 0 ? (
             <p className="text-[12px] text-ink-soft">
-              Talk or type. Briefs stay in this box. Work — CAD, Studio, CRM, PMO, Finance, a post —
-              gets assigned to a desk.
+              Talk or type. Calendar, tasks, habits, goals, and reminders land on the dashboard.
+              Desk work — CAD, Studio, CRM, PMO, Finance, a post — gets assigned to a desk.
             </p>
           ) : (
             messages.slice(-6).map((line) => (
