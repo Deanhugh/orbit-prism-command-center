@@ -6,7 +6,7 @@ https://command-center-production-e72e.up.railway.app/
 
 Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
 
-The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. The **top-right** nav is **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**. There is no Email / Mautic item in nav. The Agents Office **top-left** column is 360px wide and shows the full **Orbit Prism Operating System Command Center** lockup (same mark as Jarvis) — Jarvis / Agents pills live in the top-right, not beside the logo.
+The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center and Agents Office share the **top-right** nav: **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**, then **Live · OpenRouter** and the clock — every pill opens that page. There is no Email / Mautic item in nav. The Agents Office **top-left** column is 360px wide and shows the full **Orbit Prism Operating System Command Center** lockup (same mark as Jarvis) — Jarvis / Agents pills live in the top-right, not beside the logo. Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
 
 What landed in this stack:
 
@@ -18,6 +18,7 @@ What landed in this stack:
 - **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
 - **CAD** (`/cad`) and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
 - **Agents Office** — three-pane floor (desks, chat, artifact downloads); 360px left column with the full Orbit Prism lockup; chat-pill model list hides Demo
+- **Command Center chrome** — same top-right page nav + Live + clock as Agents Office; left System → MCP lists enabled apps (icon + name)
 
 ## Run locally
 
@@ -143,7 +144,7 @@ Command Center Settings (`/jarvis/settings`) holds **General, Appearance, Accoun
 
 The office header **Live** badge follows the provider you pick in **Settings → Providers** (OpenRouter recommended on Railway). It is **not** tied to the Claude CLI. Demo / Offline only when `ORBIT_MODE=demo`, the Demo provider is selected, or the chosen backend is unreachable. A saved OpenRouter key can still take over if the selected provider is down.
 
-A green tile in **Browse MCP** is not Live. Catalog `npx` / stdio apps stay for a machine with Claude Code. On Railway, an app is live only after you add it as a **remote HTTP/SSE** URL with OAuth or a Bearer token and **Test** is green.
+A green tile in **Browse MCP** is not Live. Catalog `npx` / stdio apps stay for a machine with Claude Code. On Railway, an app is live only after you add it as a **remote HTTP/SSE** URL with OAuth or a Bearer token and **Test** is green. Enabling an app also lists it (icon + name only) under **System → MCP** on the Command Center left panel. Disabling or removing it takes it off that list.
 
 ### Remote MCP
 

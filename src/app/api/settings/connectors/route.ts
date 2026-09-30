@@ -15,6 +15,7 @@ import { normalizeKreaUrl } from "@/lib/server/mcp-krea";
 import { normalizeHiggsfieldUrl } from "@/lib/server/mcp-higgsfield";
 import { normalizeSlackUrl, slackWorkspaceUrl } from "@/lib/server/mcp-slack";
 import { refreshMode } from "@/lib/server/runtime";
+import { listEnabledMcpApps } from "@/lib/server/mcp-nav-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,7 +60,10 @@ async function payload() {
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (req.nextUrl.searchParams.get("nav") === "1") {
+    return NextResponse.json({ apps: listEnabledMcpApps() });
+  }
   return NextResponse.json(await payload());
 }
 
