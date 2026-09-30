@@ -70,7 +70,10 @@ export function BriefingApp({ username }: { username: string }) {
                 setTab(t);
                 if (t === "History") return;
                 const kind: BriefKind = t === "Evening" ? "evening" : "morning";
-                const brief = briefs.find((b) => b.kind === kind);
+                const brief =
+                  [...briefs]
+                    .filter((b) => b.kind === kind)
+                    .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1))[0];
                 primeJarvisSpeech();
                 speakJarvis(
                   brief
