@@ -21,26 +21,41 @@ import fs from "node:fs";
 import path from "node:path";
 
 const MAX_BRIEFS = 60;
+const BRIEF_BLANK_GEN = 1;
 
 function briefsFile() {
   return path.join(dataDir(), "briefs.json");
 }
 
-export function loadBriefs(): StoredBrief[] {
+function readBriefsState(): { briefs: StoredBrief[]; blankGen: number } {
   try {
     const raw = JSON.parse(fs.readFileSync(briefsFile(), "utf8"));
-    const list = Array.isArray(raw) ? raw : raw?.briefs;
-    if (!Array.isArray(list)) return [];
-    return list.filter((b) => b && b.kind && b.date);
+    if (Array.isArray(raw)) return { briefs: raw.filter((b) => b && b.kind && b.date), blankGen: 0 };
+    const list = Array.isArray(raw?.briefs) ? raw.briefs : [];
+    return {
+      briefs: list.filter((b: StoredBrief) => b && b.kind && b.date),
+      blankGen: Number(raw?.blankGen) || 0,
+    };
   } catch {
-    return [];
+    return { briefs: [], blankGen: 0 };
   }
 }
 
-function saveBriefs(list: StoredBrief[]): void {
+export function loadBriefs(): StoredBrief[] {
+  const state = readBriefsState();
+  if (state.blankGen < BRIEF_BLANK_GEN) {
+    return persistBlankTodayMorning(state.briefs);
+  }
+  return state.briefs;
+}
+
+function saveBriefs(list: StoredBrief[], blankGen = BRIEF_BLANK_GEN): void {
   try {
     fs.mkdirSync(dataDir(), { recursive: true });
-    fs.writeFileSync(briefsFile(), JSON.stringify(list.slice(0, MAX_BRIEFS), null, 2));
+    fs.writeFileSync(
+      briefsFile(),
+      JSON.stringify({ blankGen, briefs: list.slice(0, MAX_BRIEFS) }, null, 2),
+    );
   } catch {
     /* volume may be read-only */
   }
@@ -56,7 +71,8 @@ export function upsertBrief(brief: StoredBrief): StoredBrief {
 export function latestBrief(kind: BriefKind, date?: string): StoredBrief | null {
   const list = loadBriefs();
   if (date) return list.find((b) => b.kind === kind && b.date === date) || null;
-  return list.find((b) => b.kind === kind) || null;
+  const today = dateKeyInZone(DEFAULT_TZ);
+  return list.find((b) => b.kind === kind && b.date === today) || list.find((b) => b.kind === kind) || null;
 }
 
 export function ownerContext(): { id: string; username: string; hub: JarvisHub; timezone: string } {
@@ -68,12 +84,70 @@ export function ownerContext(): { id: string; username: string; hub: JarvisHub; 
   return { id, username, hub, timezone };
 }
 
-function statusLabel(status: Task["status"]): string {
-  if (status === "waiting_approval") return "needs your OK";
-  if (status === "in_progress") return "in progress";
-  if (status === "blocked") return "blocked";
-  if (status === "done") return "done";
-  return status.replace("_", " ");
+function emptyBriefSections(kind: BriefKind): StoredBrief["sections"] {
+  return {
+    today: ["Nothing on the board today."],
+    waitingOnYou: ["Nothing waiting on you."],
+    waitingOnThem: ["Nothing waiting on them."],
+    tomorrow: ["Nothing on the calendar tomorrow yet."],
+    doneToday: kind === "evening" ? ["No desk marked work done today."] : [],
+  };
+}
+
+function briefOwnerLabel(): { owner: string; timezone: string } {
+  const user = localUsers()[0];
+  return { owner: user?.username || "there", timezone: DEFAULT_TZ };
+}
+
+function makeEmptyMorningBrief(
+  now: number,
+  owner: string,
+  timezone: string,
+  date: string,
+  existing?: StoredBrief | null,
+): StoredBrief {
+  return {
+    id: existing?.id || shortId("b"),
+    kind: "morning",
+    date,
+    createdAt: existing?.createdAt ?? now,
+    timezone,
+    owner,
+    greeting: `Good morning, ${owner}.`,
+    narrative: `Good morning, ${owner}. The board is clear today.`,
+    sections: emptyBriefSections("morning"),
+    notePath: existing?.notePath,
+    source: existing?.source || "on-demand",
+  };
+}
+
+function persistBlankTodayMorning(list: StoredBrief[], now = Date.now()): StoredBrief[] {
+  const { owner, timezone } = briefOwnerLabel();
+  const date = dateKeyInZone(timezone, now);
+  const wiped = list.map((b) =>
+    b.kind === "morning"
+      ? {
+          ...b,
+          sections: { ...emptyBriefSections("morning") },
+          narrative:
+            b.date === date ? `Good morning, ${owner}. The board is clear today.` : b.narrative,
+        }
+      : b,
+  );
+  const existing = wiped.find((b) => b.kind === "morning" && b.date === date) || null;
+  const blank = makeEmptyMorningBrief(now, owner, timezone, date, existing);
+  const rest = wiped.filter((b) => !(b.kind === "morning" && b.date === date));
+  rest.unshift(blank);
+  saveBriefs(rest, BRIEF_BLANK_GEN);
+  return rest;
+}
+
+/** Wipe today's Morning Brief Today list (and the rest of that dated brief). */
+export function clearMorningBriefForToday(now = Date.now()): StoredBrief {
+  const state = readBriefsState();
+  const list = persistBlankTodayMorning(state.briefs, now);
+  const date = dateKeyInZone(DEFAULT_TZ, now);
+  return list.find((b) => b.kind === "morning" && b.date === date) || list[0];
 }
 
 export interface BriefFacts {
@@ -102,38 +176,20 @@ export function collectBriefFacts(
   const date = dateKeyInZone(timezone, now);
   const clock = (ts: number) => formatClockInZone(ts, timezone);
   const tomorrowMs = addDaysInZone(timezone, now, 1);
-  const open = tasks.filter((t) => t.status !== "done" && t.status !== "rejected" && t.status !== "stopped");
+  void tasks;
   const personalDue = (hub.extraTasks ?? []).filter((t) => t.status !== "done");
-  const dueToday = [
-    ...personalDue
-      .filter((t) => isSameDayInZone(t.due, now, timezone))
-      .map((t) => `${t.title} (${clock(t.due)})`),
-    ...open
-      .filter((t) => isSameDayInZone(t.createdAt, now, timezone) || isSameDayInZone(t.updatedAt, now, timezone))
-      .slice(0, 8)
-      .map((t) => `${t.title} (${t.agentName} · ${statusLabel(t.status)})`),
-  ].slice(0, 10);
-  const overdue = [
-    ...personalDue
-      .filter((t) => t.due < startOfDayInZone(timezone, now))
-      .map((t) => t.title),
-    ...open
-      .filter((t) => t.createdAt < startOfDayInZone(timezone, now) - 86400000 && t.status !== "in_progress")
-      .slice(0, 6)
-      .map((t) => `${t.title} (${t.agentName})`),
-  ].slice(0, 8);
-  const inMotion = open
-    .filter((t) => t.status === "in_progress")
-    .slice(0, 8)
-    .map((t) => `${t.title} — ${t.agentName} (${t.progress}%)`);
-  const waitingOnYou = [
-    ...open.filter((t) => t.status === "waiting_approval").map((t) => `${t.title} — ${t.agentName} needs your OK`),
-    ...(hub.replies ?? []).filter((r) => !r.done).map((r) => `${r.name} — ${r.note}`),
-  ].slice(0, 8);
-  const waitingOnThem = [
-    ...open.filter((t) => /\b(chase|nudge|waiting on|follow.?up|overdue)\b/i.test(t.title)).map((t) => t.title),
-    ...(hub.reminders ?? []).filter((r) => !r.done).map((r) => `${r.title} (${clock(r.when)})`),
-  ].slice(0, 8);
+  const dueToday = personalDue
+    .filter((t) => isSameDayInZone(t.due, now, timezone))
+    .map((t) => `${t.title} (${clock(t.due)})`);
+  const overdue = personalDue
+    .filter((t) => t.due < startOfDayInZone(timezone, now))
+    .map((t) => t.title);
+  const inMotion: string[] = [];
+  const waitingOnYou = (hub.replies ?? []).filter((r) => !r.done).map((r) => `${r.name} — ${r.note}`).slice(0, 8);
+  const waitingOnThem = (hub.reminders ?? [])
+    .filter((r) => !r.done)
+    .map((r) => `${r.title} (${clock(r.when)})`)
+    .slice(0, 8);
   const weekOut = addDaysInZone(timezone, now, 7);
   const tomorrowExact = [
     ...(hub.extraEvents ?? [])
@@ -160,10 +216,10 @@ export function collectBriefFacts(
       .map((t) => `${formatWeekdayInZone(t.due, timezone)} ${t.title}`),
   ];
   const tomorrow = [...tomorrowExact, ...laterWeek];
-  const doneToday = tasks
-    .filter((t) => t.status === "done" && isSameDayInZone(t.updatedAt, now, timezone))
+  const doneToday = (hub.extraTasks ?? [])
+    .filter((t) => t.status === "done" && isSameDayInZone(t.due, now, timezone))
     .slice(0, 8)
-    .map((t) => `${t.title} (${t.agentName})`);
+    .map((t) => t.title);
   const calendar = (hub.extraEvents ?? [])
     .filter((e) => isSameDayInZone(e.start, now, timezone))
     .sort((a, b) => a.start - b.start)
@@ -179,7 +235,7 @@ export function collectBriefFacts(
     owner,
     timezone,
     date,
-    dueToday: dueToday.length ? dueToday : inMotion,
+    dueToday,
     overdue,
     inMotion,
     waitingOnYou,
@@ -223,7 +279,7 @@ function factsToSections(kind: BriefKind, facts: BriefFacts): StoredBrief["secti
     ...personalGoalLines(facts),
   ].filter(Boolean);
   return {
-    today: today.length ? today : ["Board is clear."],
+    today: today.length ? today : ["Nothing on the board today."],
     waitingOnYou: facts.waitingOnYou.length ? facts.waitingOnYou : ["Nothing waiting on you."],
     waitingOnThem: facts.waitingOnThem.length ? facts.waitingOnThem : ["Nothing waiting on them."],
     tomorrow: facts.tomorrow.length ? facts.tomorrow : ["Nothing on the calendar tomorrow yet."],

@@ -18,7 +18,7 @@ import { skillsForAgent } from "./skills";
 import { cadenceWithTime, parseCadence } from "./when";
 import { loadPersistedRoutines, savePersistedRoutines } from "./routines-store";
 import { composeBrief, liveFallbackBrief, loadBriefs, ownerContext } from "./briefs";
-import { DEFAULT_TZ } from "./zone";
+import { DEFAULT_TZ, dateKeyInZone } from "./zone";
 import {
   createDeal, listDeals, pipelineSummary, twentyConfigured, updateDeal, type DealStage,
 } from "./twenty";
@@ -575,8 +575,9 @@ function snapshotBriefs(s: RuntimeState) {
   const stored = loadBriefs();
   const tasks = [...s.tasks.values()];
   const out = [...stored];
-  if (!out.some((b) => b.kind === "morning")) out.push(liveFallbackBrief("morning", tasks));
-  if (!out.some((b) => b.kind === "evening")) out.push(liveFallbackBrief("evening", tasks));
+  const today = dateKeyInZone(DEFAULT_TZ);
+  if (!out.some((b) => b.kind === "morning" && b.date === today)) out.push(liveFallbackBrief("morning", tasks));
+  if (!out.some((b) => b.kind === "evening" && b.date === today)) out.push(liveFallbackBrief("evening", tasks));
   return out.slice(0, 12);
 }
 

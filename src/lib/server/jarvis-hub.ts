@@ -64,8 +64,9 @@ export function readHub(userId: string, username: string): JarvisHub {
 
 async function refreshBriefsAfterBlank(hub: JarvisHub, username: string) {
   try {
-    const { refreshTodayBriefs } = await import("./briefs");
+    const { clearMorningBriefForToday, refreshTodayBriefs } = await import("./briefs");
     const { emitBrief, listOfficeTasks } = await import("./runtime");
+    emitBrief(clearMorningBriefForToday());
     const briefs = refreshTodayBriefs(
       listOfficeTasks(),
       Date.now(),
