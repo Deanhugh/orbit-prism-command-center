@@ -125,9 +125,20 @@ export function VoiceSettings() {
     }
   }
 
-  function preview() {
+  async function preview() {
     primeJarvisSpeech();
-    speakJarvis(PREVIEW);
+    setNote({ ok: true, text: "Asking Fish Audio…" });
+    const result = await speakJarvis(PREVIEW);
+    if (result.source === "fish") {
+      setNote({ ok: true, text: `Playing ${status?.voice.title || "the Fish library voice"}.` });
+      return;
+    }
+    setNote({
+      ok: false,
+      text: result.reason
+        ? `${result.reason} Preview used the browser voice instead.`
+        : "Preview used the browser voice. Fish TTS did not return audio.",
+    });
   }
 
   const selected = status?.voice.referenceId;
@@ -156,7 +167,12 @@ export function VoiceSettings() {
           <a className="underline" href={FISH_KEYS} target="_blank" rel="noreferrer">
             fish.audio/app/api-keys
           </a>
-          , paste it here (or set <code>FISH_API_KEY</code> on Railway), then pick a voice. Browser speech stays as fallback if Fish is offline.
+          , paste it here (or set <code>FISH_API_KEY</code> on Railway), then pick a voice.{" "}
+          <code>s2.1-pro</code> needs{" "}
+          <a className="underline" href="https://fish.audio/app/developers" target="_blank" rel="noreferrer">
+            Fish API credit
+          </a>{" "}
+          — that is separate from website credit. The free developer model is <code>s2.1-pro-free</code>. Browser speech stays as fallback if Fish is offline.
         </p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           <div>
@@ -184,13 +200,13 @@ export function VoiceSettings() {
           <div>
             <label className="text-[9px] uppercase tracking-wide text-ink-soft">TTS model</label>
             <select
-              value={status?.voice.model || "s2.1-pro"}
+              value={status?.voice.model || "s2.1-pro-free"}
               onChange={(e) => void saveModel(e.target.value)}
               className="w-full rounded-md border border-line bg-canvas px-2 py-1 text-[11px]"
             >
-              <option value="s2.1-pro">s2.1-pro (production)</option>
-              <option value="s2.1-pro-free">s2.1-pro-free (prototype)</option>
-              <option value="s2-pro">s2-pro</option>
+              <option value="s2.1-pro-free">s2.1-pro-free (no API credit)</option>
+              <option value="s2.1-pro">s2.1-pro (needs API credit)</option>
+              <option value="s2-pro">s2-pro (needs API credit)</option>
             </select>
           </div>
         </div>

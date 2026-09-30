@@ -182,17 +182,38 @@ function speakBrowser(text: string, handlers: SpeakHandlers, token: number) {
   start();
 }
 
-async function speakFish(text: string, handlers: SpeakHandlers, token: number): Promise<boolean> {
+export type JarvisSpeakResult = { source: "fish" | "browser"; reason?: string };
+
+async function readSpeakFailure(res: Response): Promise<string> {
+  try {
+    const data = (await res.clone().json()) as { reason?: string };
+    if (data.reason) return data.reason;
+  } catch {
+    /* not json */
+  }
+  return `Fish TTS ${res.status}`;
+}
+
+async function speakFish(
+  text: string,
+  handlers: SpeakHandlers,
+  token: number,
+): Promise<JarvisSpeakResult & { used: boolean }> {
   const res = await fetch("/api/jarvis/voice/speak", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text }),
   });
-  if (token !== gen) return true;
-  if (!res.ok) return false;
+  if (token !== gen) return { used: true, source: "fish" };
+  const type = res.headers.get("content-type") || "";
+  if (!res.ok || type.includes("json")) {
+    return { used: false, source: "browser", reason: await readSpeakFailure(res) };
+  }
   const blob = await res.blob();
-  if (token !== gen) return true;
-  if (!blob.size || blob.type.includes("json")) return false;
+  if (token !== gen) return { used: true, source: "fish" };
+  if (!blob.size || blob.type.includes("json")) {
+    return { used: false, source: "browser", reason: "Fish returned no audio" };
+  }
   stopAudio();
   const url = URL.createObjectURL(blob);
   objectUrl = url;
@@ -211,18 +232,18 @@ async function speakFish(text: string, handlers: SpeakHandlers, token: number): 
   };
   try {
     await a.play();
-    return true;
+    return { used: true, source: "fish" };
   } catch {
     stopAudio();
-    return false;
+    return { used: false, source: "browser", reason: "Browser blocked Fish audio playback" };
   }
 }
 
-export function speakJarvis(text: string, handlers: SpeakHandlers = {}) {
+export function speakJarvis(text: string, handlers: SpeakHandlers = {}): Promise<JarvisSpeakResult> {
   const clean = cleanText(text, 2500);
   if (!clean) {
     handlers.onEnd?.();
-    return;
+    return Promise.resolve({ source: "browser", reason: "empty text" });
   }
   primed = true;
   const token = ++gen;
@@ -234,15 +255,18 @@ export function speakJarvis(text: string, handlers: SpeakHandlers = {}) {
     /* ignore */
   }
 
-  void (async () => {
+  return (async () => {
+    let reason: string | undefined;
     try {
-      const used = await speakFish(clean, handlers, token);
-      if (used || token !== gen) return;
+      const fish = await speakFish(clean, handlers, token);
+      if (fish.used || token !== gen) return { source: fish.source, reason: fish.reason };
+      reason = fish.reason;
     } catch {
-      /* network — browser fallback */
+      reason = "Fish TTS unreachable";
     }
-    if (token !== gen) return;
+    if (token !== gen) return { source: "browser", reason };
     speakBrowser(clean, handlers, token);
+    return { source: "browser", reason: reason || "Fish TTS unavailable" };
   })();
 }
 
