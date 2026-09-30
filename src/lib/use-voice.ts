@@ -153,7 +153,7 @@ export function useSpaceToTalk(opts: {
       if (listeningRef.current) stopRef.current();
       else startRef.current();
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
 }
