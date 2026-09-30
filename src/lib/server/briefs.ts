@@ -11,6 +11,7 @@ import {
   addDaysInZone,
   dateKeyInZone,
   formatClockInZone,
+  formatWeekdayInZone,
   isSameDayInZone,
   startOfDayInZone,
 } from "./zone";
@@ -133,7 +134,8 @@ export function collectBriefFacts(
     ...open.filter((t) => /\b(chase|nudge|waiting on|follow.?up|overdue)\b/i.test(t.title)).map((t) => t.title),
     ...(hub.reminders ?? []).filter((r) => !r.done).map((r) => `${r.title} (${clock(r.when)})`),
   ].slice(0, 8);
-  const tomorrow = [
+  const weekOut = addDaysInZone(timezone, now, 7);
+  const tomorrowExact = [
     ...(hub.extraEvents ?? [])
       .filter((e) => isSameDayInZone(e.start, tomorrowMs, timezone))
       .map((e) => `${clock(e.start)} ${e.title}`),
@@ -141,6 +143,23 @@ export function collectBriefFacts(
       .filter((t) => isSameDayInZone(t.due, tomorrowMs, timezone))
       .map((t) => `${t.title} (${clock(t.due)})`),
   ];
+  const laterEvents = (hub.extraEvents ?? [])
+    .filter((e) => e.start > tomorrowMs && e.start < weekOut && !isSameDayInZone(e.start, tomorrowMs, timezone))
+    .sort((a, b) => a.start - b.start);
+  const laterWeek = [
+    ...laterEvents.map((e) => `${formatWeekdayInZone(e.start, timezone)} ${clock(e.start)} ${e.title}`),
+    ...personalDue
+      .filter(
+        (t) =>
+          t.due > tomorrowMs &&
+          t.due < weekOut &&
+          !isSameDayInZone(t.due, tomorrowMs, timezone) &&
+          !laterEvents.some((e) => e.title === t.title && isSameDayInZone(e.start, t.due, timezone)),
+      )
+      .sort((a, b) => a.due - b.due)
+      .map((t) => `${formatWeekdayInZone(t.due, timezone)} ${t.title}`),
+  ];
+  const tomorrow = [...tomorrowExact, ...laterWeek];
   const doneToday = tasks
     .filter((t) => t.status === "done" && isSameDayInZone(t.updatedAt, now, timezone))
     .slice(0, 8)
@@ -252,22 +271,17 @@ export function refreshTodayBriefs(
   tasks: Task[],
   now = Date.now(),
   ctx?: { hub: JarvisHub; timezone: string; username: string },
+  highlights: string[] = [],
 ): StoredBrief[] {
   const facts = collectBriefFacts(tasks, now, ctx ?? ownerContext());
   const out: StoredBrief[] = [];
   for (const kind of ["morning", "evening"] as const) {
     const existing = latestBrief(kind, facts.date);
     const sections = factsToSections(kind, facts);
-    const added = [
-      ...facts.calendar,
-      ...facts.dueToday,
-      ...personalHabitLines(facts),
-      ...personalGoalLines(facts),
-    ].filter(Boolean);
     let narrative = existing?.narrative || narrativeFrom(kind, facts);
-    const missing = added.filter((line) => !narrative.toLowerCase().includes(line.toLowerCase().slice(0, 24)));
-    if (missing[0] && existing) {
-      narrative = `${narrative.replace(/\s+$/, "")} Latest: ${missing[0]}.`;
+    const mention = highlights.find((h) => h && !narrative.toLowerCase().includes(h.toLowerCase()));
+    if (mention && existing) {
+      narrative = `${narrative.replace(/\s+$/, "").replace(/( Latest: [^.]+.)+$/g, "")} Latest: ${mention}.`;
     }
     const greet = kind === "evening" ? "Good evening" : "Good morning";
     out.push(

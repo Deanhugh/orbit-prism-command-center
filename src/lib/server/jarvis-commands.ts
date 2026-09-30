@@ -259,11 +259,16 @@ export async function applyPersonalCommand(
 
   try {
     const { emitBrief, listOfficeTasks } = await import("./runtime");
-    const briefs = refreshTodayBriefs(listOfficeTasks(), now, {
-      hub: saved,
-      username,
-      timezone: saved.profile.timezone || DEFAULT_TZ,
-    });
+    const briefs = refreshTodayBriefs(
+      listOfficeTasks(),
+      now,
+      {
+        hub: saved,
+        username,
+        timezone: saved.profile.timezone || DEFAULT_TZ,
+      },
+      [parsed.title],
+    );
     for (const brief of briefs) emitBrief(brief);
   } catch {
     /* office runtime may be cold; hub write still stands */
