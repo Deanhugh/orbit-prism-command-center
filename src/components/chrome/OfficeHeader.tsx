@@ -30,13 +30,13 @@ export function OfficeHeader({
   return (
     <header
       className={cn(
-        "flex min-h-12 shrink-0 items-center gap-3 px-5 py-3 sm:px-6",
+        "flex min-h-[72px] shrink-0 items-center gap-4 px-5 py-2.5 sm:px-6",
         dark ? "" : "border-b border-line bg-panel/70",
         className,
       )}
     >
-      <div className="pointer-events-auto flex min-w-0 items-center gap-3">
-        {brand ? <Brand tone={tone} /> : null}
+      <div className="pointer-events-auto flex min-w-0 items-center gap-4">
+        {brand ? <Brand tone={tone} size="header" /> : null}
         {left}
         {title ? (
           <div className="flex min-w-0 items-baseline gap-3">

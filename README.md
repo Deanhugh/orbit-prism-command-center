@@ -6,7 +6,7 @@ https://command-center-production-e72e.up.railway.app/
 
 Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
 
-The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center, Agents Office, Marketing, Studio, Sales, PMO, CAD, Finance, and Vault share the **same top-right** cluster: **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**, then **Live · OpenRouter** and the clock. The pills never sit next to the logo or page title on the left — logo/title stay left, nav stays right. There is no Email / Mautic item in nav. The Agents Office **top-left** column is 360px wide and shows the full **Orbit Prism Operating System Command Center** lockup (same mark as Jarvis). Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
+The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center, Agents Office, Marketing, Studio, Sales, PMO, CAD, Finance, and Vault share the **same top-right** cluster: **Jarvis · Agents · Marketing · Studio · Sales · PMO · CAD · Finance · Vault**, then **Live · OpenRouter** and the clock. The pills never sit next to the logo or page title on the left — logo/title stay left, nav stays right. There is no Email / Mautic item in nav. Marketing, Studio, Sales, PMO, CAD, Finance, Vault, and Agents Office all show the full **Orbit Prism Operating System Command Center** lockup (the same `/orbit-command-center.png` mark as Jarvis) — the header left side is 220–268px so ORBIT PRISM is readable, not a 16px ink bar that vanishes on the dark canvas. The Agents Office **top-left** column is 360px wide. Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
 
 What landed in this stack:
 
@@ -19,6 +19,7 @@ What landed in this stack:
 - **CAD** (`/cad`) and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
 - **Agents Office** — three-pane floor (desks, chat, artifact downloads); 360px left column with the full Orbit Prism lockup; chat-pill model list hides Demo
 - **Command Center chrome** — same top-right page nav + Live + clock as Agents Office; that cluster stays right-aligned on every office page; left System → MCP lists enabled apps (icon + name)
+- **Office page lockup** — Marketing, Studio, Sales, PMO, CAD, Finance, and Vault use the full Orbit Prism Command Center mark in the top-left (header is taller so it fits)
 - **OpenRouter favorites** — Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router at the top of the Agents picker and Settings
 - **Jev 1.13** — TypeSafe decision model on the same OpenRouter key: picks the desk for Jarvis-routed work and gates agent tool calls; the chat LLM still writes the reply
 
