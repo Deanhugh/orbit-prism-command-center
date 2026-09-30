@@ -4,7 +4,7 @@ import { useMemo, useState, type KeyboardEvent } from "react";
 import { ArrowUp, Check, ChevronDown, Mic } from "lucide-react";
 import { ComposerPlus } from "@/components/agents/ComposerPlus";
 import { cn } from "@/lib/utils";
-import { PILL_PLACEHOLDER, mentionQuery, slashSuggestions, type SlashCmd } from "@/lib/chat-commands";
+import { PILL_PLACEHOLDER, isDemoChoice, mentionQuery, slashSuggestions, type SlashCmd } from "@/lib/chat-commands";
 import { formatTokens } from "@/lib/artifacts";
 import type { ChatUsage } from "@/lib/agents-types";
 
@@ -246,6 +246,11 @@ function ModeMenu({ value, onChange }: { value: ChatMode; onChange: (m: ChatMode
   );
 }
 
+function displayModel(value: string) {
+  if (!value || isDemoChoice("", value)) return "Model";
+  return value;
+}
+
 function ModelPicker({
   value,
   provider,
@@ -259,12 +264,14 @@ function ModelPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const liveOptions = options.filter((o) => !isDemoChoice(o.provider, o.model));
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? options.filter((o) => o.model.toLowerCase().includes(q) || o.provider.toLowerCase().includes(q))
-    : options;
+    ? liveOptions.filter((o) => o.model.toLowerCase().includes(q) || o.provider.toLowerCase().includes(q))
+    : liveOptions;
 
   function choose(model: string, nextProvider?: string) {
+    if (isDemoChoice(nextProvider, model)) return;
     onPick(model, nextProvider);
     setQuery("");
     setOpen(false);
@@ -278,7 +285,7 @@ function ModelPicker({
         title="Model"
         className="flex max-w-[160px] items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium text-ink-soft hover:bg-canvas-2 hover:text-ink"
       >
-        <span className="truncate">{value || "Model"}</span>
+        <span className="truncate">{displayModel(value)}</span>
         <ChevronDown size={12} className={cn("shrink-0", open && "rotate-180")} />
       </button>
       {open && (

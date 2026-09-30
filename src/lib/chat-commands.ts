@@ -35,3 +35,8 @@ export function mentionQuery(text: string): string | null {
 }
 
 export const PILL_PLACEHOLDER = "Message or run a task, / commands, @ files";
+
+/** Demo provider/model stays in Settings; hide it from the Agents Office pill. */
+export function isDemoChoice(provider?: string, model?: string) {
+  return /^demo$/i.test(provider ?? "") || /^demo$/i.test(model ?? "");
+}

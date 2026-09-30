@@ -25,36 +25,32 @@ function isActive(pathname: string, href: string) {
 }
 
 /**
- * Shared top nav. Jarvis sits immediately beside Agents and both stay
- * visible in the top-left cluster on every office page.
+ * Shared office-page nav. Lives in the top-right HeaderControls cluster
+ * (Jarvis · Agents · Marketing · …). The Agents Office left column shows
+ * only the Orbit Prism wordmark — not this bar.
  */
 export function PageNav({
   tone = "default",
-  pairOnly = false,
 }: {
   tone?: "default" | "dark";
-  /** Jarvis + Agents only — for the top-left brand cluster. */
-  pairOnly?: boolean;
 }) {
   const pathname = usePathname() || "/";
   const dark = tone === "dark";
   return (
-    <nav className="flex flex-wrap items-center gap-1" aria-label={pairOnly ? "Jarvis and Agents" : "Office pages"}>
+    <nav className="flex flex-wrap items-center gap-1" aria-label="Office pages">
       {PRIMARY.map((it) => (
         <NavPill key={it.href} href={it.href} label={it.label} active={isActive(pathname, it.href)} dark={dark} />
       ))}
-      {pairOnly
-        ? null
-        : REST.map((it) => (
-            <NavPill
-              key={it.href}
-              href={it.href}
-              label={it.label}
-              active={isActive(pathname, it.href)}
-              dark={dark}
-              className="hidden sm:inline-flex"
-            />
-          ))}
+      {REST.map((it) => (
+        <NavPill
+          key={it.href}
+          href={it.href}
+          label={it.label}
+          active={isActive(pathname, it.href)}
+          dark={dark}
+          className="hidden sm:inline-flex"
+        />
+      ))}
     </nav>
   );
 }
