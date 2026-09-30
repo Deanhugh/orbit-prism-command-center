@@ -2,17 +2,13 @@
 
 import { useMemo } from "react";
 import { useJarvisHub } from "../useJarvisHub";
-import { formatClockHM, seedEvents, startOfDay, type JarvisEvent } from "@/lib/jarvis-data";
+import { formatClockHM, startOfDay, type JarvisEvent } from "@/lib/jarvis-data";
 
 export function CalendarApp() {
   const { hub } = useJarvisHub();
   const events = useMemo(
-    () =>
-      [
-        ...(hub?.suppressSeeds?.calendar ? [] : seedEvents()),
-        ...(hub?.extraEvents ?? []),
-      ].sort((a, b) => a.start - b.start),
-    [hub?.extraEvents, hub?.suppressSeeds?.calendar],
+    () => [...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
+    [hub?.extraEvents],
   );
   const horizon = startOfDay(Date.now()) + 14 * 86400000;
   const upcoming = events.filter((e) => e.start < horizon);

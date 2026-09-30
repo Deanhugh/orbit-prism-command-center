@@ -154,10 +154,50 @@ export interface JarvisHub {
   reminders: JarvisReminder[];
   replies: JarvisReply[];
   projects: JarvisProject[];
+  meetings: JarvisMeeting[];
   appearance: JarvisAppearance;
   crm: JarvisCrmTaxonomy;
   greetings: string[];
   suppressSeeds: JarvisSuppressSeeds;
+  /** Bump to wipe persisted demo rows on existing hubs. */
+  dashboardBlankGen: number;
+}
+
+export const DASHBOARD_BLANK_GEN = 1;
+
+export function blankDashboardLists(): Pick<
+  JarvisHub,
+  | "habitsDone"
+  | "articles"
+  | "notes"
+  | "proposals"
+  | "extraEvents"
+  | "extraTasks"
+  | "extraHabits"
+  | "goals"
+  | "reminders"
+  | "replies"
+  | "projects"
+  | "meetings"
+  | "suppressSeeds"
+  | "dashboardBlankGen"
+> {
+  return {
+    habitsDone: [],
+    articles: [],
+    notes: [],
+    proposals: [],
+    extraEvents: [],
+    extraTasks: [],
+    extraHabits: [],
+    goals: [],
+    reminders: [],
+    replies: [],
+    projects: [],
+    meetings: [],
+    suppressSeeds: { calendar: true, habits: true },
+    dashboardBlankGen: DASHBOARD_BLANK_GEN,
+  };
 }
 
 function day(offset: number, hour = 9, minute = 0): number {
@@ -530,21 +570,10 @@ export function seedReplies(): JarvisReply[] {
 export function emptyHub(username: string): JarvisHub {
   return {
     profile: defaultProfile(username),
-    habitsDone: [],
-    articles: seedArticles(),
-    notes: seedNotes(),
-    proposals: seedProposals(),
-    extraEvents: [],
-    extraTasks: [],
-    extraHabits: [],
-    goals: seedGoals(),
-    reminders: seedReminders(),
-    replies: seedReplies(),
-    projects: seedProjects(),
     appearance: defaultAppearance(),
     crm: defaultCrmTaxonomy(),
     greetings: defaultGreetings(),
-    suppressSeeds: {},
+    ...blankDashboardLists(),
   };
 }
 

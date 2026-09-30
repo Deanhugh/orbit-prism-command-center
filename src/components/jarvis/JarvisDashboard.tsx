@@ -11,8 +11,6 @@ import {
   greetingWord,
   pickGreeting,
   isSameDay,
-  seedEvents,
-  seedHabits,
   startOfDay,
   type JarvisEvent,
   type JarvisTask,
@@ -38,7 +36,6 @@ export function JarvisDashboard({
   initialHub?: JarvisHub | null;
 }) {
   const { hub, save } = useJarvisHub(initialHub, username);
-  const officeTasks = useOffice((s) => s.tasks);
   const officeBriefs = useOffice((s) => s.briefs);
   useOrbitInit();
   const [now, setNow] = useState(() => Date.now());
@@ -62,22 +59,12 @@ export function JarvisDashboard({
   const greet = greetingWord(new Date(now));
   const progress = dayProgress(new Date(now));
 
-  const tasks = useMemo(
-    () => mergeTasks(officeTasks, hub?.extraTasks ?? []),
-    [officeTasks, hub?.extraTasks],
-  );
+  const tasks = useMemo(() => mergeTasks([], hub?.extraTasks ?? []), [hub?.extraTasks]);
   const events = useMemo(
-    () =>
-      [
-        ...(hub?.suppressSeeds?.calendar ? [] : seedEvents()),
-        ...(hub?.extraEvents ?? []),
-      ].sort((a, b) => a.start - b.start),
-    [hub?.extraEvents, hub?.suppressSeeds?.calendar],
+    () => [...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
+    [hub?.extraEvents],
   );
-  const habits = useMemo(
-    () => [...(hub?.suppressSeeds?.habits ? [] : seedHabits()), ...(hub?.extraHabits ?? [])],
-    [hub?.extraHabits, hub?.suppressSeeds?.habits],
-  );
+  const habits = useMemo(() => [...(hub?.extraHabits ?? [])], [hub?.extraHabits]);
   const done = new Set(hub?.habitsDone ?? []);
 
   const filtered = tasks.filter((t) => {

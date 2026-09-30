@@ -1,5 +1,6 @@
 import { shortId } from "../utils";
 import {
+  blankDashboardLists,
   type JarvisEvent,
   type JarvisGoal,
   type JarvisHabit,
@@ -320,7 +321,6 @@ async function applyClearCommand(
   parsed: ParsedPersonalCommand,
   now: number,
 ): Promise<AppliedPersonalUpdate> {
-  const tz = hub.profile.timezone || DEFAULT_TZ;
   const specific = isSpecificTitle(parsed.title);
   const patch: Partial<JarvisHub> = {};
   let cleared = 0;
@@ -368,6 +368,18 @@ async function applyClearCommand(
       cleared += list.length - next.length;
       patch.reminders = next;
     }
+  }
+
+  if (!specific && parsed.surfaces.length >= 5) {
+    const blank = blankDashboardLists();
+    patch.articles = blank.articles;
+    patch.notes = blank.notes;
+    patch.proposals = blank.proposals;
+    patch.replies = blank.replies;
+    patch.projects = blank.projects;
+    patch.meetings = blank.meetings;
+    patch.dashboardBlankGen = blank.dashboardBlankGen;
+    cleared += 1;
   }
 
   const saved = Object.keys(patch).length ? patchHub(userId, username, patch) : hub;

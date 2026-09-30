@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { formatWhen, seedMeetings } from "@/lib/jarvis-data";
+import { formatWhen } from "@/lib/jarvis-data";
+import { useJarvisHub } from "../useJarvisHub";
 
 export function MeetingsApp() {
+  const { hub } = useJarvisHub();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
-  const rows = seedMeetings().filter((m) => {
+  const rows = (hub?.meetings ?? []).filter((m) => {
     if (!q.trim()) return true;
     return `${m.title} ${m.notes} ${m.attendees}`.toLowerCase().includes(q.toLowerCase());
   });
