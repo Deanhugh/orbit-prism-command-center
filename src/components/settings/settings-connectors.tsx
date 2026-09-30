@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { McpBrowse, type McpCatalogRow } from "@/components/settings/McpBrowse";
 import { MCP_CATALOG } from "@/lib/mcp-catalog";
+import { notifyMcpNav } from "@/lib/mcp-nav";
 import { PlatformConnections } from "@/components/settings/settings-platforms";
 
 interface ConnRow {
@@ -61,7 +62,13 @@ export function Connectors() {
     if (err) return err;
     return "";
   });
-  const load = () => fetch("/api/settings/connectors").then((r) => r.json()).then(setData);
+  const load = () =>
+    fetch("/api/settings/connectors")
+      .then((r) => r.json())
+      .then((d) => {
+        setData(d);
+        notifyMcpNav();
+      });
   useEffect(() => { load(); }, []);
 
   const customs = customList(data?.custom || []);

@@ -21,10 +21,14 @@ import {
   Users,
   Video,
 } from "lucide-react";
-import { accountHandle, cn, formatClock } from "@/lib/utils";
+import { accountHandle, cn } from "@/lib/utils";
 import { APP_HOME } from "@/lib/home";
 import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
 import { applyAppearance, defaultAppearance } from "@/lib/jarvis-appearance";
+import { HeaderControls } from "@/components/chrome/HeaderControls";
+import { useOrbitInit } from "@/lib/use-orbit-init";
+import { useOffice } from "@/lib/store";
+import { McpNav } from "@/components/jarvis/McpNav";
 
 const APPS = [
   { href: "/jarvis/briefing", label: "Briefing", icon: Newspaper, ai: true },
@@ -59,8 +63,12 @@ export function JarvisShell({
   const pathname = usePathname() || APP_HOME;
   const router = useRouter();
   const [open, setOpen] = useState(true);
-  const [clock, setClock] = useState("--:--:--");
   const [mobileNav, setMobileNav] = useState(false);
+  useOrbitInit();
+  const refreshMode = useOffice((s) => s.refreshMode);
+  useEffect(() => {
+    refreshMode();
+  }, [refreshMode]);
 
   useEffect(() => {
     try {
@@ -87,13 +95,6 @@ export function JarvisShell({
       /* keep the last working tokens */
     }
   }, [hub?.appearance]);
-
-  useEffect(() => {
-    const tick = () => setClock(formatClock());
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
 
   function toggleSidebar() {
     setOpen((v) => {
@@ -152,7 +153,7 @@ export function JarvisShell({
       ) : null}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-panel/80 px-3 backdrop-blur-md sm:px-5">
+        <header className="flex min-h-12 shrink-0 items-center justify-between gap-3 border-b border-line bg-panel/80 px-3 backdrop-blur-md sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
@@ -163,8 +164,10 @@ export function JarvisShell({
               <PanelLeftOpen size={16} />
             </button>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <span className="serif tabular-nums text-[13px] font-semibold text-cyan">{clock}</span>
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <div className="flex justify-end">
+              <HeaderControls />
+            </div>
           </div>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto thin-scroll">{children}</main>
@@ -265,6 +268,7 @@ function SidebarBody({
             onNavigate={onNavigate}
           />
         ))}
+        <McpNav open={open} onNavigate={onNavigate} />
       </nav>
       <div className="border-t border-line px-2 py-2">
         <NavLink
