@@ -489,10 +489,12 @@ export function MessagesApp({ username }: { username: string }) {
   return (
     <div className="flex h-screen w-screen flex-col overflow-y-auto bg-canvas text-ink lg:flex-row lg:overflow-hidden">
       {/* left: Agents list (top) + animated Office scene (bottom) */}
-      <aside className="flex h-[70vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[300px] lg:border-b-0 lg:border-r">
-        <div className="flex items-center gap-2 px-4 py-3">
-          <Brand size="office" tone="dark" />
-          <Link href="/jarvis/settings?tab=mcp" className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
+      <aside className="flex h-[70vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[360px] lg:border-b-0 lg:border-r">
+        <div className="flex items-start gap-2 px-4 pb-3 pt-4">
+          <div className="min-w-0 flex-1">
+            <Brand size="office" />
+          </div>
+          <Link href="/jarvis/settings?tab=mcp" className="mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
             <Plus size={13} />
           </Link>
         </div>
