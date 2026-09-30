@@ -228,7 +228,7 @@ These are separate Railway projects. Command Center talks to them over HTTP with
 - Command Center vars: `TWENTY_API_URL`, `TWENTY_APP_URL`, `TWENTY_API_KEY`
 - Sales board: https://command-center-production-e72e.up.railway.app/sales
 
-Sign into Twenty, then open `/sales`. The board is **live** (not mock) when those three variables are set and `/api/crm/config` reports `reachable: true`. Create or rotate the key in Twenty → Settings → API & Webhooks (key name **Command Center**).
+Sign into Twenty, then open `/sales`. The board is **live** (not mock) when those three variables are set and `/api/crm/config` reports `reachable: true`. Create or rotate the key in Twenty → Settings → API & Webhooks (key name **Command Center**). Social CRM (`/jarvis/crm`) starts empty — sample Twenty contacts are wiped once on read and the local mock no longer reseeds Amara/Wei/Elena rows.
 
 ### Bigcapital — `/finance` (books)
 
