@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { cn } from "@/lib/utils";
-import { PageNav } from "@/components/chrome/PageNav";
-import { Brand } from "@/components/chrome/Brand";
+import { OfficeHeader } from "@/components/chrome/OfficeHeader";
 import { Providers } from "@/components/settings/settings-providers";
 import { Connectors } from "@/components/settings/settings-connectors";
 import { Skills } from "@/components/settings/settings-skills";
@@ -60,13 +59,7 @@ function SettingsInner() {
   }, [tab]);
   return (
     <div className="min-h-screen w-screen overflow-y-auto bg-canvas text-ink">
-      <header className="flex items-center justify-between border-b border-line bg-panel/70 px-6 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Brand />
-          <PageNav />
-          <h1 className="serif text-[15px] font-bold">Settings</h1>
-        </div>
-      </header>
+      <OfficeHeader title="Settings" />
 
       <div className="mx-auto flex max-w-[900px] gap-2 px-6 py-3">
         {(["providers", "voice", "connectors", "skills", "routines"] as Tab[]).map((t) => (

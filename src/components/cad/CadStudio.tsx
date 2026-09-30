@@ -1,8 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Brand } from "@/components/chrome/Brand";
-import { PageNav } from "@/components/chrome/PageNav";
+import { OfficeHeader } from "@/components/chrome/OfficeHeader";
 import { CadViewport } from "@/components/cad/CadViewport";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { AGENTS } from "@/lib/office-data";
@@ -117,16 +116,7 @@ export function CadStudio() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-canvas text-ink">
-      <header className="flex items-center justify-between border-b border-line bg-panel/80 px-6 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Brand />
-          <PageNav />
-          <div className="flex items-baseline gap-3">
-            <h1 className="serif text-[15px] font-bold">CAD</h1>
-            <span className="hidden text-[11px] text-ink-soft sm:inline">Text to part · Engineering studio</span>
-          </div>
-        </div>
-      </header>
+      <OfficeHeader title="CAD" subtitle="Text to part · Engineering studio" />
 
       <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(300px,400px)_1fr]">
         <section className="flex min-h-0 flex-col border-r border-line bg-panel">

@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { cn } from "@/lib/utils";
-import { PageNav } from "@/components/chrome/PageNav";
-import { Brand } from "@/components/chrome/Brand";
+import { OfficeHeader } from "@/components/chrome/OfficeHeader";
 
 const STAGES = ["NEW", "SCREENING", "MEETING", "PROPOSAL", "CUSTOMER"] as const;
 type Stage = (typeof STAGES)[number];
@@ -86,16 +85,7 @@ export function CrmBoard() {
 
   return (
     <div className="min-h-screen w-screen overflow-y-auto bg-canvas text-ink">
-      <header className="flex items-center justify-between border-b border-line bg-panel/70 px-6 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Brand />
-          <PageNav />
-          <div className="flex items-baseline gap-3">
-            <h1 className="serif text-[15px] font-bold">Sales</h1>
-            <span className="hidden text-[11px] text-ink-soft sm:inline">Deal flow · powered by Twenty</span>
-          </div>
-        </div>
-      </header>
+      <OfficeHeader title="Sales" subtitle="Deal flow · powered by Twenty" />
 
       <div className={cn("mx-auto px-6 py-4", view === "platform" ? "max-w-[1400px]" : "max-w-[1200px]")}>
         <div className="mb-4 flex flex-wrap items-center gap-3">

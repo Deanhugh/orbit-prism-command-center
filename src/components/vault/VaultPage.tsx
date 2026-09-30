@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { HeaderControls } from "@/components/chrome/HeaderControls";
-import { PageNav } from "@/components/chrome/PageNav";
+import { OfficeHeader } from "@/components/chrome/OfficeHeader";
 import { useRouter } from "next/navigation";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import type { GNode } from "./Brain3D";
@@ -117,9 +116,12 @@ export function VaultPage() {
 
       {/* header */}
       {!cinema && (
-        <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-6 py-3">
-          <div className="pointer-events-auto flex flex-wrap items-center gap-3">
-            <div className="flex flex-col items-start leading-none">
+        <OfficeHeader
+          tone="dark"
+          brand={false}
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 border-0 bg-transparent"
+          left={
+            <div className="pointer-events-auto flex flex-col items-start leading-none">
               <Image
                 src="/orbit-logo-white.png"
                 alt="Orbit Prism"
@@ -132,13 +134,13 @@ export function VaultPage() {
                 Operating System Command Center
               </span>
             </div>
-            <PageNav tone="dark" />
-          </div>
-          <div className="pointer-events-auto flex items-center gap-3">
-            <HeaderControls tone="dark" showNav={false} />
-            <button onClick={logout} className="text-[9px] tracking-[0.2em] hover:text-white" style={{ color: C.muted }}>SIGN OUT</button>
-          </div>
-        </header>
+          }
+          extra={
+            <button onClick={logout} className="pointer-events-auto text-[9px] tracking-[0.2em] hover:text-white" style={{ color: C.muted }}>
+              SIGN OUT
+            </button>
+          }
+        />
       )}
 
       {/* search */}

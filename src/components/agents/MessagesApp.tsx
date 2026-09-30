@@ -11,7 +11,7 @@ import { DEPARTMENTS } from "@/lib/office-data";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
 import { useSpaceToTalk, useVoice } from "@/lib/use-voice";
-import { HeaderControls } from "@/components/chrome/HeaderControls";
+import { OfficeHeader } from "@/components/chrome/OfficeHeader";
 import { BrainGraphOverlay } from "@/components/chrome/BrainGraphOverlay";
 import { Brand } from "@/components/chrome/Brand";
 import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
@@ -632,16 +632,17 @@ export function MessagesApp({ username }: { username: string }) {
       {/* center: chat + optional artifact pane */}
       <div className="flex min-h-[80vh] w-full min-w-0 flex-1 flex-col lg:min-h-0 lg:flex-row">
       <main className="flex min-h-[80vh] w-full min-w-0 flex-1 flex-col lg:min-h-0">
-        <header className="flex items-center justify-between border-b border-line px-5 py-3">
-          <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: active?.accent }} />
-            <span className="serif text-[14px] font-bold">{active?.title}</span>
-            <span className="text-[10px] uppercase tracking-wide text-ink-soft">{active?.subtitle}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <HeaderControls />
-          </div>
-        </header>
+        <OfficeHeader
+          brand={false}
+          className="border-b border-line bg-transparent px-5 py-3"
+          left={
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: active?.accent }} />
+              <span className="serif text-[14px] font-bold">{active?.title}</span>
+              <span className="text-[10px] uppercase tracking-wide text-ink-soft">{active?.subtitle}</span>
+            </div>
+          }
+        />
 
         <div className="thin-scroll flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {messages.length === 0 && !draft && (
