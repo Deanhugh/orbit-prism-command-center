@@ -4,7 +4,7 @@ import { prepareChat } from "@/lib/server/agent-chat";
 import { chatStream } from "@/lib/server/llm";
 import { executeTool } from "@/lib/server/composio";
 import { loadAgentsConfig, type ProviderId } from "@/lib/server/providers";
-import type { ChatToolStep } from "@/lib/agents-types";
+import type { ChatMessage, ChatToolStep } from "@/lib/agents-types";
 import { looksLikeClearChat } from "@/lib/clear-chat";
 
 export const runtime = "nodejs";
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
 
       let content = "";
       const tools: ChatToolStep[] = [];
+      let usage: ChatMessage["usage"];
       try {
         for await (const ev of chatStream({
           provider,
@@ -91,7 +92,10 @@ export async function POST(req: NextRequest) {
             else tools.push({ name: ev.name, status: ev.status, detail: ev.detail });
             send(ev);
           } else if (ev.type === "error") { send(ev); }
-          else if (ev.type === "done") { content = ev.content || content; }
+          else if (ev.type === "done") {
+            content = ev.content || content;
+            usage = ev.usage;
+          }
         }
       } catch (e) {
         send({ type: "error", error: String(e).slice(0, 160) });
@@ -103,6 +107,7 @@ export async function POST(req: NextRequest) {
         agentId: responderId,
         agentName: prepared.responderName,
         tools: tools.length ? tools : undefined,
+        usage,
       });
       send({ type: "done", message: saved });
       controller.close();

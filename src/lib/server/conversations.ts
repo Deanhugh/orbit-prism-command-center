@@ -89,6 +89,7 @@ export function appendMessage(convId: string, msg: Omit<ChatMessage, "id" | "ts"
     agentId: msg.agentId,
     agentName: msg.agentName,
     tools: msg.tools,
+    usage: msg.usage,
   };
   const all = getMessages(convId);
   all.push(full);

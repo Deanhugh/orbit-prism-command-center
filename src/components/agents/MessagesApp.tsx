@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ArrowUp, Check, ChevronDown, ChevronRight, Mic, Plus, Settings } from "lucide-react";
-import type { AgentConversation, ChatMessage, ChatToolStep } from "@/lib/agents-types";
+import { ChevronRight, Plus, Settings } from "lucide-react";
+import type { AgentConversation, ChatMessage, ChatToolStep, ChatUsage } from "@/lib/agents-types";
 import type { AgentRuntimeInfo, Task } from "@/lib/types";
 import { DEPARTMENTS } from "@/lib/office-data";
 import { useOrbitInit } from "@/lib/use-orbit-init";
@@ -16,10 +16,13 @@ import { PageNav } from "@/components/chrome/PageNav";
 import { BrainGraphOverlay } from "@/components/chrome/BrainGraphOverlay";
 import { Brand } from "@/components/chrome/Brand";
 import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
-import { ComposerPlus } from "@/components/agents/ComposerPlus";
 import { OfficeSafe } from "@/components/agents/OfficeSafe";
+import { ChatPill } from "@/components/agents/ChatPill";
+import { ArtifactPane } from "@/components/agents/ArtifactPane";
 import { accountHandle, cn, timeAgo } from "@/lib/utils";
 import { looksLikeClearChat } from "@/lib/clear-chat";
+import { parseSlash, type SlashCmd } from "@/lib/chat-commands";
+import { estimateTokens, extractVideoUrl, inferArtifactKind, titleFromMarkdown, type ArtifactMeta } from "@/lib/artifacts";
 
 // The animated 3D office scene (client-only), embedded compactly under the agents list.
 const OfficeScene = dynamic(() => import("@/components/office/OfficeCanvas"), {
@@ -110,6 +113,10 @@ export function MessagesApp({ username }: { username: string }) {
   });
   const [allSkills, setAllSkills] = useState<SkillInfo[]>([]);
   const [attachments, setAttachments] = useState<string[]>([]);
+  const [artifact, setArtifact] = useState<ArtifactMeta | null>(null);
+  const [brainFiles, setBrainFiles] = useState<{ title: string; path: string }[]>([]);
+  const [lastUsage, setLastUsage] = useState<ChatUsage | null>(null);
+  const [tokPerSec, setTokPerSec] = useState(0);
   const [statuses, setStatuses] = useState<Record<string, AgentStatus>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const endRef = useRef<HTMLDivElement>(null);
@@ -149,6 +156,34 @@ export function MessagesApp({ username }: { username: string }) {
     setPref({ model });
   }
   function pickSkill(skill: string) { setPref({ skill }); }
+  function pickMode(mode: ChatMode) { setPref({ mode }); }
+
+  async function handleSlash(cmd: SlashCmd, rest: string) {
+    if (cmd === "/clear") {
+      setInput("");
+      await clearOpenChat();
+      return;
+    }
+    if (cmd === "/help") {
+      setInput("");
+      setMessages((m) => [...m, {
+        id: "help-" + Date.now(),
+        role: "assistant",
+        content: "Pill commands: /clear · /task [text] · /plan [text] · /chat [text] · @filename to attach a Brain note.",
+        ts: Date.now(),
+        agentName: active?.title || "Office",
+      }]);
+      return;
+    }
+    if (cmd === "/task") pickMode("task");
+    else if (cmd === "/plan") pickMode("plan");
+    else if (cmd === "/chat") pickMode("chat");
+    if (rest) {
+      setInput(rest);
+      return;
+    }
+    setInput("");
+  }
 
   const modelCatalog = useMemo(() => {
     const rows: { provider: string; model: string }[] = [];
@@ -225,6 +260,9 @@ export function MessagesApp({ username }: { username: string }) {
   // Load skills once for the Skill picker / insert menu.
   useEffect(() => {
     fetch("/api/settings/skills").then((r) => r.json()).then((d) => setAllSkills(d.skills || [])).catch(() => {});
+    fetch("/api/brain").then((r) => r.json()).then((d) => {
+      setBrainFiles((d.nodes || []).map((n: { title: string; path: string }) => ({ title: n.title, path: n.path })));
+    }).catch(() => {});
   }, []);
 
   const officeAgents = useOffice((s) => s.agents);
@@ -296,24 +334,46 @@ export function MessagesApp({ username }: { username: string }) {
   }
 
   async function send() {
-    const text = [input.trim(), attachments.length ? `Attached: ${attachments.join(", ")}` : ""].filter(Boolean).join("\n\n");
+    let raw = input.trim();
+    const slash = parseSlash(raw);
+    if (slash) {
+      if (slash.command === "/clear") {
+        await clearOpenChat();
+        return;
+      }
+      if (slash.command === "/help") {
+        await handleSlash("/help", "");
+        return;
+      }
+      if (slash.command === "/task") pickMode("task");
+      else if (slash.command === "/plan") pickMode("plan");
+      else if (slash.command === "/chat") pickMode("chat");
+      raw = slash.rest;
+      if (!raw) {
+        setInput("");
+        return;
+      }
+    }
+    const text = [raw, attachments.length ? `Attached: ${attachments.join(", ")}` : ""].filter(Boolean).join("\n\n");
     if (!text || busy || !active) return;
-    if (looksLikeClearChat(input.trim())) {
+    if (looksLikeClearChat(raw)) {
       await clearOpenChat();
       return;
     }
     setAttachments([]);
-    if (current.mode === "task") { await dispatchTask(text); return; }
+    const modeNow = slash?.command === "/task" ? "task" : slash?.command === "/plan" ? "plan" : slash?.command === "/chat" ? "chat" : current.mode;
+    if (modeNow === "task") { await dispatchTask(text); return; }
     setBusy(true);
     setInput("");
     setMessages((m) => [...m, { id: "u" + Date.now(), role: "user", content: text, ts: Date.now() }]);
     setDraft({ content: "", agentName: active.title, tools: [] });
+    const t0 = Date.now();
 
     try {
       const res = await fetch("/api/agents/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: active.id, text, provider: current.provider, model: current.model, mode: current.mode, skill: current.skill || undefined }),
+        body: JSON.stringify({ conversationId: active.id, text, provider: current.provider, model: current.model, mode: modeNow, skill: current.skill || undefined }),
       });
       if (!res.body) throw new Error("no stream");
       const reader = res.body.getReader();
@@ -349,9 +409,39 @@ export function MessagesApp({ username }: { username: string }) {
           } else if (ev.type === "done") { doneMsg = ev.message; }
         }
       }
-      if (doneMsg) setMessages((m) => [...m, doneMsg!]);
+      const reply = doneMsg?.content || content;
+      const usage = doneMsg?.usage || {
+        promptTokens: estimateTokens(text),
+        completionTokens: estimateTokens(reply),
+        totalTokens: estimateTokens(text) + estimateTokens(reply),
+        cachedTokens: 0,
+        estimated: true,
+      };
+      setLastUsage(usage);
+      const sec = (Date.now() - t0) / 1000;
+      if (sec > 0 && usage.completionTokens) setTokPerSec(usage.completionTokens / sec);
+      if (doneMsg) setMessages((m) => [...m, { ...doneMsg!, usage: doneMsg!.usage || usage }]);
       setDraft(null);
-      // refresh sidebar previews
+      const kind = inferArtifactKind(text, reply);
+      if (kind && reply.trim()) {
+        try {
+          const art = await fetch("/api/agents/artifacts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              markdown: reply,
+              prompt: text,
+              kind,
+              convId: active.id,
+              title: titleFromMarkdown(reply, active.title),
+              videoUrl: extractVideoUrl(reply),
+            }),
+          }).then((r) => r.json());
+          if (art.artifact) setArtifact(art.artifact);
+        } catch {
+          /* preview optional */
+        }
+      }
       fetch("/api/agents/conversations").then((r) => r.json()).then((d) => setConvs(d.conversations || [])).catch(() => {});
     } catch {
       setDraft(null);
@@ -360,12 +450,41 @@ export function MessagesApp({ username }: { username: string }) {
     }
   }
 
+  async function openPreview(markdown: string) {
+    const kind = inferArtifactKind("", markdown) || "document";
+    try {
+      const art = await fetch("/api/agents/artifacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown,
+          kind,
+          convId: activeId,
+          title: titleFromMarkdown(markdown, active?.title || "Deliverable"),
+          videoUrl: extractVideoUrl(markdown),
+        }),
+      }).then((r) => r.json());
+      if (art.artifact) setArtifact(art.artifact);
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function logout() { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); }
+
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const pillSkills = allSkills.filter((s) => {
+    if (isJarvis || s.agents?.includes("all")) return true;
+    if (activeAgentName && s.agents?.includes(activeAgentName)) return true;
+    const unnamed = !s.agents?.length;
+    if (unnamed && activeDeptId && (s.department === activeDeptId || s.department === "all")) return true;
+    return false;
+  });
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-y-auto bg-canvas text-ink lg:flex-row lg:overflow-hidden">
       {/* left: Agents list (top) + animated Office scene (bottom) */}
-      <aside className="flex h-[80vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[480px] lg:border-b-0 lg:border-r">
+      <aside className="flex h-[70vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[300px] lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-2 px-4 py-3">
           <Brand />
           <PageNav pairOnly />
@@ -464,7 +583,7 @@ export function MessagesApp({ username }: { username: string }) {
           ))}
         </div>
         {/* animated Office scene — under the agents panel (bottom-left) */}
-        <div className="relative h-[380px] shrink-0 overflow-hidden border-t border-line">
+        <div className="relative h-[200px] shrink-0 overflow-hidden border-t border-line">
           <OfficeSafe>
             <OfficeScene zoom={22} />
           </OfficeSafe>
@@ -504,7 +623,8 @@ export function MessagesApp({ username }: { username: string }) {
         </div>
       </aside>
 
-      {/* right: chat */}
+      {/* center: chat + optional artifact pane */}
+      <div className="flex min-h-[80vh] w-full min-w-0 flex-1 flex-col lg:min-h-0 lg:flex-row">
       <main className="flex min-h-[80vh] w-full min-w-0 flex-1 flex-col lg:min-h-0">
         <header className="flex items-center justify-between border-b border-line px-5 py-3">
           <div className="flex items-center gap-2">
@@ -524,7 +644,14 @@ export function MessagesApp({ username }: { username: string }) {
               <p className="mt-1">Say what you need. {current.provider === "demo" ? "Running in demo — pick a model in the chat box below to go live." : ""}</p>
             </div>
           )}
-          {messages.map((m) => <MessageRow key={m.id} m={m} accent={active?.accent || "#888"} />)}
+          {messages.map((m) => (
+            <MessageRow
+              key={m.id}
+              m={m}
+              accent={active?.accent || "#888"}
+              onPreview={m.role === "assistant" ? () => void openPreview(m.content) : undefined}
+            />
+          ))}
           {draft && <DraftRow content={draft.content} agentName={draft.agentName} tools={draft.tools} accent={active?.accent || "#888"} />}
           <div ref={endRef} />
         </div>
@@ -532,103 +659,56 @@ export function MessagesApp({ username }: { username: string }) {
         {/* composer — capsule chat + Clear Chat outside it */}
         <div className="relative z-30 overflow-visible border-t border-line px-5 py-3">
           <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1 overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
-            <div className="flex items-end gap-2 overflow-visible">
-              <ComposerPlus
-                skills={allSkills.filter((s) => {
-                  if (isJarvis || s.agents?.includes("all")) return true;
-                  if (activeAgentName && s.agents?.includes(activeAgentName)) return true;
-                  const unnamed = !s.agents?.length;
-                  if (unnamed && activeDeptId && (s.department === activeDeptId || s.department === "all")) return true;
-                  return false;
-                })}
-                onPickSkill={(name) => {
-                  pickSkill(name);
-                  setInput((v) => (v ? `${v} ` : "") + `Use the ${name} skill: `);
-                }}
-                onAttachBrain={(file) => {
-                  setAttachments((a) => a.includes(file.title) ? a : [...a, file.title]);
-                  setInput((v) => (v ? `${v}\n` : "") + `Use [[${file.title}]] from the Brain.`);
-                }}
-                onAttachLocal={(file) => {
-                  setAttachments((a) => a.includes(file.name) ? a : [...a, file.name]);
-                  if (file.size < 200_000 && (file.type.startsWith("text") || file.name.endsWith(".md"))) {
-                    void file.text().then((text) => {
-                      setInput((v) => `${v}\n\n[Attached ${file.name}]\n${text.slice(0, 8000)}`);
-                    });
-                  } else {
-                    setInput((v) => `${v}\n[Attached file: ${file.name}]`);
-                  }
-                }}
-              />
-
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                rows={1}
-                placeholder="Send a message…"
-                className="max-h-32 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-[13px] outline-none placeholder:text-ink-soft/60"
-              />
-
-              {voiceSupported && (
-                <button
-                  onMouseDown={start}
-                  onMouseUp={stop}
-                  className={cn("grid h-8 w-8 shrink-0 place-items-center rounded-full", listening ? "bg-finance text-white" : "text-ink-soft hover:bg-canvas-2 hover:text-ink")}
-                  title="Hold to talk, or press Space"
-                >
-                  <Mic size={15} />
-                </button>
-              )}
-              <button
-                onClick={send}
-                disabled={busy || !input.trim()}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink text-canvas transition disabled:opacity-40"
-                title="Send"
-              >
-                <ArrowUp size={16} />
-              </button>
-            </div>
-
-            {attachments.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1 px-1">
-                {attachments.map((name) => (
-                  <button
-                    key={name}
-                    onClick={() => setAttachments((a) => a.filter((n) => n !== name))}
-                    className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] text-ink-soft hover:text-ink"
-                    title="Remove attachment"
-                  >
-                    {name} ×
-                  </button>
-                ))}
-              </div>
-            )}
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 px-1">
-              <ModelPicker
-                value={current.model}
-                provider={current.provider}
-                options={modelCatalog}
-                onPick={pickModel}
-              />
-              {current.skill && (
-                <button
-                  type="button"
-                  onClick={() => pickSkill("")}
-                  className="rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] text-ink-soft hover:text-ink"
-                  title="Clear skill"
-                >
-                  Skill: {current.skill} ×
-                </button>
-              )}
-            </div>
-            </div>
+            <ChatPill
+              input={input}
+              onInput={setInput}
+              onSend={() => void send()}
+              busy={busy}
+              mode={current.mode}
+              onMode={pickMode}
+              onSlash={(cmd, rest) => void handleSlash(cmd, rest)}
+              model={current.model}
+              provider={current.provider}
+              modelOptions={modelCatalog}
+              onPickModel={pickModel}
+              voiceSupported={voiceSupported}
+              listening={listening}
+              start={start}
+              stop={stop}
+              skills={pillSkills}
+              onPickSkill={(name) => {
+                pickSkill(name);
+                setInput((v) => (v ? `${v} ` : "") + `Use the ${name} skill: `);
+              }}
+              onAttachBrain={(file) => {
+                setAttachments((a) => a.includes(file.title) ? a : [...a, file.title]);
+                setInput((v) => (v ? `${v}\n` : "") + `Use [[${file.title}]] from the Brain.`);
+              }}
+              onAttachLocal={(file) => {
+                setAttachments((a) => a.includes(file.name) ? a : [...a, file.name]);
+                if (file.size < 200_000 && (file.type.startsWith("text") || file.name.endsWith(".md"))) {
+                  void file.text().then((text) => {
+                    setInput((v) => `${v}\n\n[Attached ${file.name}]\n${text.slice(0, 8000)}`);
+                  });
+                } else {
+                  setInput((v) => `${v}\n[Attached file: ${file.name}]`);
+                }
+              }}
+              attachments={attachments}
+              onRemoveAttachment={(name) => setAttachments((a) => a.filter((n) => n !== name))}
+              brainFiles={brainFiles}
+              stats={{
+                turns: messages.filter((m) => m.role === "user").length,
+                steps: draft?.tools.length || lastAssistant?.tools?.length || 0,
+                tokPerSec,
+                usage: lastUsage || lastAssistant?.usage || null,
+              }}
+            />
             <button
               type="button"
               onClick={() => void clearOpenChat()}
               disabled={busy || (!messages.length && !draft)}
-              className="mb-1 shrink-0 self-end rounded-full border border-line bg-panel px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
+              className="mb-6 shrink-0 self-end rounded-full border border-line bg-panel px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
               title="Clear this chat history"
             >
               Clear Chat
@@ -636,106 +716,12 @@ export function MessagesApp({ username }: { username: string }) {
           </div>
         </div>
       </main>
+      {artifact && <ArtifactPane artifact={artifact} onClose={() => setArtifact(null)} />}
+      </div>
 
       {/* Brain graph modal (opened from the Tasks panel's Brain card) */}
       <BrainGraphOverlay />
     </div>
-  );
-}
-
-function ModelPicker({
-  value,
-  provider,
-  options,
-  onPick,
-}: {
-  value: string;
-  provider: string;
-  options: { provider: string; model: string }[];
-  onPick: (model: string, provider?: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-  const filtered = q
-    ? options.filter((o) => o.model.toLowerCase().includes(q) || o.provider.toLowerCase().includes(q))
-    : options;
-
-  function choose(model: string, nextProvider?: string) {
-    onPick(model, nextProvider);
-    setQuery("");
-    setOpen(false);
-  }
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        title="Model"
-        className="flex max-w-[220px] items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium text-ink-soft hover:bg-canvas-2 hover:text-ink"
-      >
-        <span className="truncate">{value || "Select a model"}</span>
-        <ChevronDown size={12} className={cn("shrink-0", open && "rotate-180")} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-8 left-0 z-20 w-72 overflow-hidden rounded-lg border border-line bg-panel shadow-lg">
-            <input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && query.trim()) {
-                  e.preventDefault();
-                  choose(query.trim(), provider);
-                }
-                if (e.key === "Escape") setOpen(false);
-              }}
-              placeholder="Search models"
-              className="w-full border-b border-line bg-transparent px-3 py-2 text-[12px] text-ink outline-none placeholder:text-ink-soft"
-            />
-            <div className="max-h-56 overflow-y-auto py-1">
-              {filtered.length === 0 && (
-                <p className="px-3 py-2 text-[11px] text-ink-soft">
-                  {query.trim() ? `Press Enter to use “${query.trim()}”` : "No models yet — type a name from ollama list."}
-                </p>
-              )}
-              {filtered.map((o) => {
-                const selected = o.model === value && o.provider === provider;
-                return (
-                  <button
-                    key={`${o.provider}:${o.model}`}
-                    type="button"
-                    onClick={() => choose(o.model, o.provider)}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink hover:bg-canvas-2"
-                  >
-                    <span className="min-w-0 flex-1 truncate">{o.model}</span>
-                    {selected && <Check size={13} className="shrink-0 text-ink" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Pill({ label, value, onChange, options, title }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; title?: string }) {
-  return (
-    <label title={title} className="flex items-center gap-1 rounded-full border border-line bg-panel px-2 py-0.5 text-[10px] text-ink-soft hover:border-ink-soft">
-      {label && <span className="font-semibold uppercase tracking-wide">{label}</span>}
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="max-w-[150px] cursor-pointer bg-transparent text-[10px] font-medium text-ink outline-none"
-      >
-        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-      </select>
-    </label>
   );
 }
 
@@ -770,7 +756,7 @@ function ToolChecklist({ tools }: { tools: ChatToolStep[] }) {
   );
 }
 
-function MessageRow({ m, accent }: { m: ChatMessage; accent: string }) {
+function MessageRow({ m, accent, onPreview }: { m: ChatMessage; accent: string; onPreview?: () => void }) {
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
@@ -786,6 +772,11 @@ function MessageRow({ m, accent }: { m: ChatMessage; accent: string }) {
       </div>
       {m.tools && <ToolChecklist tools={m.tools} />}
       <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-canvas-2 px-3.5 py-2 text-[13px] text-ink whitespace-pre-wrap">{m.content}</div>
+      {onPreview && m.content.trim().length > 80 && (
+        <button type="button" onClick={onPreview} className="mt-1 text-[10px] uppercase tracking-wide text-ink-soft hover:text-ink">
+          Open in pane
+        </button>
+      )}
     </div>
   );
 }
