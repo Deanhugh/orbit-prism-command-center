@@ -80,8 +80,13 @@ export const CURATED_FISH_VOICES: FishVoice[] = [
 export const DEFAULT_FISH_VOICE: FishVoiceConfig = {
   referenceId: CURATED_FISH_VOICES[0].id,
   title: CURATED_FISH_VOICES[0].title,
-  model: "s2.1-pro",
+  model: "s2.1-pro-free",
 };
+
+function isCreditError(status: number, reason: string) {
+  if (status === 402) return true;
+  return /insufficient api credit|api credit|no payment|payment required/i.test(reason);
+}
 
 const MODELS: FishTtsModel[] = ["s2.1-pro", "s2.1-pro-free", "s2-pro"];
 
@@ -204,12 +209,11 @@ export type FishSpeakResult =
   | { ok: true; audio: Buffer; contentType: string }
   | { ok: false; fallback: true; reason: string };
 
-export async function synthesizeFish(text: string): Promise<FishSpeakResult> {
-  const key = fishApiKey();
-  if (!key) return { ok: false, fallback: true, reason: "no Fish API key" };
-  const clean = text.replace(/\s+/g, " ").trim().slice(0, 2500);
-  if (!clean) return { ok: false, fallback: true, reason: "empty text" };
-  const cfg = loadFishVoiceConfig();
+async function requestFishTts(
+  key: string,
+  text: string,
+  cfg: FishVoiceConfig,
+): Promise<FishSpeakResult & { status?: number }> {
   try {
     const res = await fetch(FISH_TTS_URL, {
       method: "POST",
@@ -218,7 +222,7 @@ export async function synthesizeFish(text: string): Promise<FishSpeakResult> {
         model: cfg.model,
       }),
       body: JSON.stringify({
-        text: clean,
+        text,
         reference_id: cfg.referenceId,
         format: "mp3",
         latency: "balanced",
@@ -239,23 +243,49 @@ export async function synthesizeFish(text: string): Promise<FishSpeakResult> {
           if (buf.length < 400) reason = buf.toString("utf8") || reason;
         }
       }
-      return { ok: false, fallback: true, reason };
+      return { ok: false, fallback: true, reason, status: res.status };
     }
     if (contentType.includes("json")) {
       try {
         const err = JSON.parse(buf.toString("utf8")) as { message?: string; error?: string };
-        return { ok: false, fallback: true, reason: err.message || err.error || "Fish returned JSON instead of audio" };
+        return {
+          ok: false,
+          fallback: true,
+          reason: err.message || err.error || "Fish returned JSON instead of audio",
+          status: res.status,
+        };
       } catch {
-        return { ok: false, fallback: true, reason: "Fish returned JSON instead of audio" };
+        return { ok: false, fallback: true, reason: "Fish returned JSON instead of audio", status: res.status };
       }
     }
     if (buf.length < 64) {
-      return { ok: false, fallback: true, reason: "Fish returned empty audio" };
+      return { ok: false, fallback: true, reason: "Fish returned empty audio", status: res.status };
     }
     return { ok: true, audio: buf, contentType: contentType.includes("audio") ? contentType : "audio/mpeg" };
   } catch (err) {
     return { ok: false, fallback: true, reason: err instanceof Error ? err.message : "Fish TTS unreachable" };
   }
+}
+
+export async function synthesizeFish(text: string): Promise<FishSpeakResult> {
+  const key = fishApiKey();
+  if (!key) return { ok: false, fallback: true, reason: "no Fish API key" };
+  const clean = text.replace(/\s+/g, " ").trim().slice(0, 2500);
+  if (!clean) return { ok: false, fallback: true, reason: "empty text" };
+  const cfg = loadFishVoiceConfig();
+  const first = await requestFishTts(key, clean, cfg);
+  if (first.ok) return first;
+  if (cfg.model !== "s2.1-pro-free" && isCreditError(first.status || 0, first.reason)) {
+    const freeCfg = saveFishVoiceConfig({ model: "s2.1-pro-free" });
+    const retry = await requestFishTts(key, clean, freeCfg);
+    if (retry.ok) return retry;
+    return {
+      ok: false,
+      fallback: true,
+      reason: `${retry.reason} Paid ${cfg.model} needs API credit at https://fish.audio/app/developers. s2.1-pro-free also failed.`,
+    };
+  }
+  return first;
 }
 
 export async function fishStatus(search?: string) {
@@ -273,7 +303,7 @@ export async function fishStatus(search?: string) {
     libraryTotal: library.total,
     libraryOk: library.ok,
     reason: key
-      ? `Fish Audio · ${voice.title}`
+      ? `Fish Audio · ${voice.title} · ${voice.model}`
       : "Paste a Fish API key to use a library voice. Browser speech stays as fallback.",
   };
 }
