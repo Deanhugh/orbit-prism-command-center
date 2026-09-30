@@ -69,6 +69,17 @@ export function getMessages(convId: string): ChatMessage[] {
   }
 }
 
+export function clearConversation(convId: string): boolean {
+  if (!conversationById(convId)) return false;
+  try {
+    fs.mkdirSync(chatsDir(), { recursive: true });
+    fs.writeFileSync(fileFor(convId), "[]\n");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function appendMessage(convId: string, msg: Omit<ChatMessage, "id" | "ts"> & Partial<Pick<ChatMessage, "id" | "ts">>): ChatMessage {
   const full: ChatMessage = {
     id: msg.id || shortId("c"),

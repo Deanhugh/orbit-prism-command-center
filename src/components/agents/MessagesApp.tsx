@@ -19,6 +19,7 @@ import { useJarvisHub } from "@/components/jarvis/useJarvisHub";
 import { ComposerPlus } from "@/components/agents/ComposerPlus";
 import { OfficeSafe } from "@/components/agents/OfficeSafe";
 import { accountHandle, cn, timeAgo } from "@/lib/utils";
+import { looksLikeClearChat } from "@/lib/clear-chat";
 
 // The animated 3D office scene (client-only), embedded compactly under the agents list.
 const OfficeScene = dynamic(() => import("@/components/office/OfficeCanvas"), {
@@ -173,7 +174,33 @@ export function MessagesApp({ username }: { username: string }) {
   const activeDeptId = active?.deptId;
   const isJarvis = activeAgentId === "jarvis";
 
-  const onVoice = useCallback((t: string) => setInput((prev) => (prev ? prev + " " : "") + t), []);
+  const clearOpenChat = useCallback(async () => {
+    if (!activeId) return;
+    setDraft(null);
+    setInput("");
+    setAttachments([]);
+    setMessages([]);
+    try {
+      const res = await fetch("/api/agents/conversations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: activeId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (Array.isArray(d.conversations)) setConvs(d.conversations);
+      setMessages([]);
+    } catch {
+      /* keep the empty thread locally */
+    }
+  }, [activeId]);
+
+  const onVoice = useCallback((t: string) => {
+    if (looksLikeClearChat(t)) {
+      void clearOpenChat();
+      return;
+    }
+    setInput((prev) => (prev ? prev + " " : "") + t);
+  }, [clearOpenChat]);
   const { supported: voiceSupported, listening, start, stop } = useVoice(onVoice);
   useSpaceToTalk({ enabled: voiceSupported, listening, start, stop });
 
@@ -236,6 +263,10 @@ export function MessagesApp({ username }: { username: string }) {
   // Task mode: dispatch the message as real work through the task engine.
   async function dispatchTask(text: string) {
     if (!active) return;
+    if (looksLikeClearChat(text)) {
+      await clearOpenChat();
+      return;
+    }
     setBusy(true);
     setInput("");
     const ts = Date.now();
@@ -267,6 +298,10 @@ export function MessagesApp({ username }: { username: string }) {
   async function send() {
     const text = [input.trim(), attachments.length ? `Attached: ${attachments.join(", ")}` : ""].filter(Boolean).join("\n\n");
     if (!text || busy || !active) return;
+    if (looksLikeClearChat(input.trim())) {
+      await clearOpenChat();
+      return;
+    }
     setAttachments([]);
     if (current.mode === "task") { await dispatchTask(text); return; }
     setBusy(true);
@@ -299,6 +334,11 @@ export function MessagesApp({ username }: { username: string }) {
           if (!t.startsWith("data:")) continue;
           const ev = JSON.parse(t.slice(5).trim());
           if (ev.type === "start") { agentName = ev.agentName; }
+          else if (ev.type === "cleared") {
+            setMessages([]);
+            setDraft(null);
+            doneMsg = null;
+          }
           else if (ev.type === "token") { content += ev.text; setDraft({ content, agentName, tools: [...tools] }); }
           else if (ev.type === "tool") {
             const ex = tools.find((x) => x.name === ev.name && x.status === "running");
@@ -489,9 +529,10 @@ export function MessagesApp({ username }: { username: string }) {
           <div ref={endRef} />
         </div>
 
-        {/* composer — Cursor-style: insert menu, Mode / Skill / Model, mic */}
+        {/* composer — capsule chat + Clear Chat outside it */}
         <div className="relative z-30 overflow-visible border-t border-line px-5 py-3">
-          <div className="overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
+          <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1 overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
             <div className="flex items-end gap-2 overflow-visible">
               <ComposerPlus
                 skills={allSkills.filter((s) => {
@@ -582,6 +623,16 @@ export function MessagesApp({ username }: { username: string }) {
                 </button>
               )}
             </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void clearOpenChat()}
+            disabled={busy || (!messages.length && !draft)}
+            className="mb-1 shrink-0 self-end rounded-full border border-line bg-panel px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
+            title="Clear this chat history"
+          >
+            Clear Chat
+          </button>
           </div>
         </div>
       </main>
