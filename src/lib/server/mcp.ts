@@ -22,7 +22,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   gmail: ALL_DEPTS,
   googledrive: ["delivery", "ops"],
   notion: ALL_DEPTS,
-  slack: ["emails", "ops"],
+  slack: ALL_DEPTS,
   canva: ["marketing", "delivery"],
   meta: ["marketing"],
   stripe: ["finance"],

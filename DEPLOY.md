@@ -41,6 +41,9 @@ Keep it running so routines fire on schedule (`pm2` or `launchd`). Local Ollama 
    | `NOTION_TOKEN` | optional | Notion internal integration token if you prefer env over Settings. |
    | `APIFY_TOKEN` | optional | Apify API token if you prefer env over Settings → MCP. |
    | `KREA_API_TOKEN` | optional | Krea API token if you prefer env over Settings → MCP (OAuth is the default). |
+   | `SLACK_WORKSPACE_URL` | optional | Slack workspace. Defaults to `https://orbit-prism.slack.com`. |
+   | `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | optional | Slack app credentials for MCP OAuth (Slack has no dynamic registration). Or paste them in Settings → MCP. |
+   | `SLACK_USER_TOKEN` | optional | `xoxp-` user token if you skip OAuth. |
    | `FISH_API_KEY` | optional | Fish Audio TTS for Jarvis voice. Or paste the key under Settings → Voice. |
    | `COMPOSIO_API_KEY` | optional | Extra SaaS connectors. |
    | `ORBIT_MODE=demo` | no | Only if you want simulated agent work. Leave unset for live providers. |

@@ -24,6 +24,7 @@ interface CustomRow {
   target: string;
   auth?: string;
   hasToken?: boolean;
+  hasClient?: boolean;
 }
 interface ConnData {
   live: boolean;
@@ -32,6 +33,7 @@ interface ConnData {
   deny: string[];
   custom: CustomRow[] | string[];
   catalog?: McpCatalogRow[];
+  slackWorkspace?: string;
 }
 
 function customList(raw: ConnData["custom"]): CustomRow[] {
@@ -101,9 +103,13 @@ export function Connectors() {
   const apify = data?.connectors.find((c) => c.key === "apify");
   const krea = data?.connectors.find((c) => c.key === "krea" || c.key === "kreaai");
   const higgsfield = data?.connectors.find((c) => c.key === "higgsfield" || c.key === "higgsfeild");
+  const slack = data?.connectors.find((c) => c.key === "slack");
+  const slackCustom = customs.find((c) => c.key === "slack");
   const apifyUrl = MCP_CATALOG.find((i) => i.id === "apify")?.command || "https://mcp.apify.com";
   const kreaUrl = MCP_CATALOG.find((i) => i.id === "krea")?.command || "https://api.krea.ai/mcp";
   const higgsfieldUrl = MCP_CATALOG.find((i) => i.id === "higgsfield")?.command || "https://mcp.higgsfield.ai/mcp";
+  const slackUrl = MCP_CATALOG.find((i) => i.id === "slack")?.command || "https://mcp.slack.com/mcp";
+  const slackWorkspace = data?.slackWorkspace || "https://orbit-prism.slack.com";
 
   return (
     <div className="space-y-3">
@@ -143,11 +149,18 @@ export function Connectors() {
         url={higgsfieldUrl}
         onSaved={load}
       />
+      <SlackPanel
+        row={slack}
+        url={slackUrl}
+        workspace={slackWorkspace}
+        hasClient={slackCustom?.hasClient}
+        onSaved={load}
+      />
 
       <section id="browse-mcp" className="rounded-lg border border-line bg-panel p-4">
         <h2 className="mb-1 text-[12px] font-bold uppercase tracking-widest text-ink-soft">Browse MCP</h2>
         <p className="mb-3 text-[11px] text-ink-soft">
-          Remote apps (Notion, Apify, Krea, Higgsfield, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
+          Remote apps (Notion, Apify, Krea, Higgsfield, Slack, GitHub, Stripe) go live on Railway with OAuth or a token. Local <code className="text-ink">npx</code> servers stay for a machine with Claude Code.
         </p>
         <McpBrowse
           catalog={data?.catalog || []}
@@ -276,6 +289,108 @@ function HiggsfieldPanel({ row, url, onSaved }: { row?: ConnRow; url: string; on
         {" "}via Connect with OAuth. Jobs use your Higgsfield plan credits (MCP is not the unlimited web allowance).
       </p>
       <AuthActions name="Higgsfield" url={url} auth="oauth" onSaved={onSaved} hasToken={row?.hasToken} oauthOnly />
+    </section>
+  );
+}
+
+function SlackPanel({
+  row,
+  url,
+  workspace,
+  hasClient,
+  onSaved,
+}: {
+  row?: ConnRow;
+  url: string;
+  workspace: string;
+  hasClient?: boolean;
+  onSaved: () => void;
+}) {
+  const live = row?.status === "connected";
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function saveApp() {
+    if (!clientId.trim() && !clientSecret.trim()) return;
+    setBusy(true);
+    setMsg("");
+    const res = await fetch("/api/settings/connectors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Slack",
+        transport: "http",
+        target: url,
+        auth: "oauth",
+        clientId: clientId.trim() || undefined,
+        clientSecret: clientSecret.trim() || undefined,
+      }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    setClientId("");
+    setClientSecret("");
+    setMsg(d.message || d.error || "Saved Slack app credentials.");
+    onSaved();
+  }
+
+  return (
+    <section className="rounded-lg border border-line bg-panel p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn("h-2 w-2 rounded-full", live ? "bg-emails" : "bg-finance")} />
+        <h2 className="text-[12px] font-bold uppercase tracking-widest text-ink-soft">Slack — live remote MCP</h2>
+        <span className="text-[10px] text-ink-soft">{row?.reason || "Not connected yet"}</span>
+      </div>
+      <p className="mt-1 text-[11px] leading-relaxed text-ink-soft">
+        Workspace{" "}
+        <a className="underline" href={workspace} target="_blank" rel="noreferrer">
+          {workspace.replace(/^https?:\/\//, "")}
+        </a>
+        . Agents search channels, read threads, and send messages through Slack’s hosted MCP at{" "}
+        <code className="text-ink">https://mcp.slack.com/mcp</code>. Slack does not register OAuth apps automatically —
+        create an internal app at{" "}
+        <a className="underline" href="https://api.slack.com/apps" target="_blank" rel="noreferrer">
+          api.slack.com/apps
+        </a>
+        , add redirect URI{" "}
+        <code className="text-ink">/api/settings/connectors/oauth/callback</code>
+        , paste Client ID + Secret below, then Connect with OAuth. Or paste an <code className="text-ink">xoxp-</code> user
+        token. For phone DMs with Agents, OAuth is the first step; a Slack bot can be added next.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <input
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+          placeholder={hasClient ? "•••• client id saved — paste to replace" : "Slack app Client ID"}
+          className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]"
+        />
+        <input
+          type="password"
+          value={clientSecret}
+          onChange={(e) => setClientSecret(e.target.value)}
+          placeholder="Slack app Client Secret"
+          className="w-full rounded-md border border-line bg-canvas px-2 py-1.5 text-[12px]"
+        />
+      </div>
+      <button
+        type="button"
+        onClick={saveApp}
+        disabled={busy || (!clientId.trim() && !clientSecret.trim())}
+        className="mt-2 rounded-md border border-line px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
+      >
+        {busy ? "Saving…" : "Save Slack app"}
+      </button>
+      {msg ? <p className="mt-1 text-[11px] text-ink-soft">{msg}</p> : null}
+      <AuthActions
+        name="Slack"
+        url={url}
+        auth="oauth"
+        onSaved={onSaved}
+        hasToken={row?.hasToken}
+        placeholder="xoxp- user token (optional if using OAuth)"
+      />
     </section>
   );
 }

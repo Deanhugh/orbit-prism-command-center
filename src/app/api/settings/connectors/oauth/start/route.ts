@@ -5,6 +5,7 @@ import { mcpKey } from "@/lib/server/mcp-auth";
 import { startMcpOAuth } from "@/lib/server/mcp-oauth";
 import { normalizeKreaUrl } from "@/lib/server/mcp-krea";
 import { normalizeHiggsfieldUrl } from "@/lib/server/mcp-higgsfield";
+import { normalizeSlackUrl } from "@/lib/server/mcp-slack";
 import { requestOrigin, redirectTo } from "@/lib/server/auth-http";
 
 export const runtime = "nodejs";
@@ -27,6 +28,9 @@ export async function GET(req: NextRequest) {
   }
   if (mcpKey(name) === "higgsfield" || mcpKey(name) === "higgsfeild" || /higgsfield\.ai/i.test(target)) {
     target = normalizeHiggsfieldUrl(target);
+  }
+  if (mcpKey(name) === "slack" || /slack\.com/i.test(target)) {
+    target = normalizeSlackUrl(target);
   }
   if (transport === "stdio" || !/^https?:\/\//i.test(target)) {
     return NextResponse.json(

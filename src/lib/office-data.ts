@@ -167,6 +167,7 @@ const OFFICE_APPS = [
   "apify",
   "krea",
   "higgsfield",
+  "slack",
 ];
 
 for (const ag of AGENTS) {
@@ -185,7 +186,7 @@ export const DEMO_CONNECTORS: Connector[] = [
   c("Studio", "studio", "connected", ALL_DEPTS, "Orbit Studio — text-to-cut on /studio"),
   c("CAD Studio", "cad", "connected", ALL_DEPTS, "Orbit CAD — text-to-part on /cad"),
   c("GitHub", "github", "connected", ALL_DEPTS),
-  c("Slack", "slack", "connected", ["emails", "ops"]),
+  c("Slack", "slack", "connected", ALL_DEPTS),
   c("Canva", "canva", "connected", ["marketing", "delivery"]),
   c("Meta Ads", "meta", "connected", ["marketing"]),
   c("Stripe", "stripe", "connected", ["finance"]),

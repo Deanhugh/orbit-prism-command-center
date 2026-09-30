@@ -12,7 +12,7 @@ What landed in this stack:
 
 - **Live** follows OpenRouter (or another HTTP provider), not the Claude CLI
 - **Skills** — four originals plus 33 `agency-*` desk playbooks
-- **Remote MCP** on Railway — Notion, Apify (scrape), Krea (image/video), Higgsfield (image/video/audio), GitHub, Stripe
+- **Remote MCP** on Railway — Notion, Apify (scrape), Krea (image/video), Higgsfield (image/video/audio), Slack ([orbit-prism.slack.com](https://orbit-prism.slack.com)), GitHub, Stripe
 - **Routines** — Morning Brief and Evening Wrap on the dashboard
 - **Jarvis Today** — spoken/typed chat that can dispatch office work
 - **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
@@ -158,7 +158,7 @@ OAuth callback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`. Tokens s
 3. **Connect with OAuth** or **Save token**, then **Test**.
 4. Green / `connected` means agents can use it on live tasks. `needs_auth` means the URL is saved but there is no working token yet.
 
-That is the same pattern for Notion, Apify, Krea, Higgsfield, GitHub, Stripe, and any other hosted MCP.
+That is the same pattern for Notion, Apify, Krea, Higgsfield, Slack, GitHub, Stripe, and any other hosted MCP.
 
 #### Notion
 
@@ -200,6 +200,19 @@ The Streamable HTTP server is `https://mcp.higgsfield.ai/mcp`. Higgsfield MCP is
 3. Click **Test**. Agents then generate images, video, Soul characters, or audio only on live tasks that mention Higgsfield or ask to generate — not on every office task.
 
 MCP generations use your Higgsfield plan credits (not the unlimited web allowance). OAuth uses the MCP-native authorization server at `mcp.higgsfield.ai` (PKCE + dynamic client registration), not Clerk device-auth.
+
+#### Slack (orbit-prism.slack.com)
+
+Workspace: [orbit-prism.slack.com](https://orbit-prism.slack.com). The Streamable HTTP server is `https://mcp.slack.com/mcp` — pasting the workspace URL as a custom MCP is rewritten to that endpoint. Slack MCP does **not** support automatic OAuth app registration (no DCR). You need an internal Slack app Client ID + Secret.
+
+1. Open **Settings → MCP** → **Slack — live remote MCP**.
+2. Create an internal app at [api.slack.com/apps](https://api.slack.com/apps) on the orbit-prism workspace. Redirect URI: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`.
+3. Paste Client ID + Secret and **Save Slack app**, then **Connect with OAuth**. Or paste an `xoxp-` user token and **Save token**.
+4. Click **Test**. Agents then search channels and send messages only on live tasks that mention Slack — not on every office task.
+
+This MCP path is for agents reading and posting in Slack. Two-way phone DMs with Agents need a Slack bot (Events API / Socket Mode) as a follow-up — it is not this connector.
+
+Optional env: `SLACK_WORKSPACE_URL` (defaults to `https://orbit-prism.slack.com`), `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_USER_TOKEN` / `SLACK_BOT_TOKEN` / `SLACK_TOKEN`. Do not vendor [korotovsky/slack-mcp-server](https://github.com/korotovsky/slack-mcp-server) — that is a local stdio server, not the hosted OAuth path.
 
 #### GitHub and Stripe
 
@@ -313,6 +326,9 @@ Optional MCP tokens (same names as Settings → MCP) if you prefer env over the 
 | `NOTION_TOKEN` / `NOTION_API_KEY` | Notion |
 | `APIFY_TOKEN` | Apify scrape |
 | `KREA_API_TOKEN` | Krea image/video |
+| `SLACK_WORKSPACE_URL` | Slack workspace (`https://orbit-prism.slack.com`) |
+| `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | Slack app for MCP OAuth (no DCR) |
+| `SLACK_USER_TOKEN` / `SLACK_BOT_TOKEN` / `SLACK_TOKEN` | Slack token if you skip OAuth |
 
 OAuth and pasted tokens also land in `/app/data/secrets.json`. Custom connectors persist in `/app/data/connectors.json`. Routines persist in `/app/data/routines.json`. CAD and Studio files are `cad-models.json` and `studio-productions.json` on the same volume.
 

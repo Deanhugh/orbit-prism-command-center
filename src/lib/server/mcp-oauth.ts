@@ -9,6 +9,7 @@ import {
   mcpRefreshToken,
   setMcpTokens,
 } from "./mcp-auth";
+import { isSlackMcpUrl } from "./mcp-slack";
 
 interface OAuthMeta {
   authorization_endpoint?: string;
@@ -16,6 +17,7 @@ interface OAuthMeta {
   registration_endpoint?: string;
   code_challenge_methods_supported?: string[];
   scopes_supported?: string[];
+  token_endpoint_auth_methods_supported?: string[];
 }
 
 interface PendingAuth {
@@ -27,6 +29,8 @@ interface PendingAuth {
   tokenEndpoint: string;
   clientId: string;
   clientSecret?: string;
+  tokenAuth: "basic" | "post" | "none";
+  omitResource?: boolean;
   createdAt: number;
 }
 
@@ -229,10 +233,22 @@ export async function startMcpOAuth(opts: {
     setMcpTokens(key, { clientId, clientSecret: clientSecret || null });
   }
   if (!clientId) {
+    if (isSlackMcpUrl(opts.url)) {
+      throw new Error(
+        "Slack needs a Slack app Client ID and Secret. Paste them in Settings → MCP → Slack (or set SLACK_CLIENT_ID / SLACK_CLIENT_SECRET on Railway), then Connect with OAuth. Slack does not support automatic app registration.",
+      );
+    }
     throw new Error("OAuth client id missing — this server does not support dynamic registration.");
   }
   const { verifier, challenge } = pkce();
   const state = b64url(crypto.randomBytes(16));
+  const methods = stringList(meta.token_endpoint_auth_methods_supported);
+  const tokenAuth: PendingAuth["tokenAuth"] = methods.includes("client_secret_post")
+    ? "post"
+    : clientSecret
+      ? "basic"
+      : "none";
+  const slack = isSlackMcpUrl(opts.url);
   const pending = readPending();
   pending[state] = {
     key,
@@ -243,6 +259,8 @@ export async function startMcpOAuth(opts: {
     tokenEndpoint,
     clientId,
     clientSecret,
+    tokenAuth,
+    omitResource: slack,
     createdAt: Date.now(),
   };
   writePending(pending);
@@ -254,7 +272,7 @@ export async function startMcpOAuth(opts: {
   u.searchParams.set("code_challenge", challenge);
   u.searchParams.set("code_challenge_method", "S256");
   if (scopes.length) u.searchParams.set("scope", scopes.join(" "));
-  u.searchParams.set("resource", resource);
+  if (!slack) u.searchParams.set("resource", resource);
   return { authorizeUrl: u.toString() };
 }
 
@@ -263,23 +281,39 @@ async function tokenRequest(
   body: Record<string, string>,
   clientId: string,
   clientSecret?: string,
-): Promise<{ access_token?: string; refresh_token?: string; expires_in?: number; error?: string }> {
+  tokenAuth: "basic" | "post" | "none" = "none",
+): Promise<{ access_token?: string; refresh_token?: string; expires_in?: number; error?: string; ok?: boolean }> {
   const headers: Record<string, string> = {
     "Content-Type": "application/x-www-form-urlencoded",
     Accept: "application/json",
   };
   const params = new URLSearchParams(body);
-  if (clientSecret) {
+  if (tokenAuth === "post" && clientSecret) {
+    params.set("client_id", clientId);
+    params.set("client_secret", clientSecret);
+  } else if (tokenAuth === "basic" && clientSecret) {
     headers.Authorization = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`;
   } else {
     params.set("client_id", clientId);
+    if (clientSecret) params.set("client_secret", clientSecret);
   }
   const res = await fetch(tokenEndpoint, { method: "POST", headers, body: params });
-  return (await res.json().catch(() => ({}))) as {
+  const raw = (await res.json().catch(() => ({}))) as {
+    ok?: boolean;
     access_token?: string;
     refresh_token?: string;
     expires_in?: number;
     error?: string;
+    authed_user?: { access_token?: string };
+  };
+  const access = raw.access_token || raw.authed_user?.access_token;
+  const error = raw.ok === false ? raw.error || "token exchange failed" : raw.error;
+  return {
+    access_token: access,
+    refresh_token: raw.refresh_token,
+    expires_in: raw.expires_in,
+    error: access ? undefined : error,
+    ok: raw.ok,
   };
 }
 
@@ -296,10 +330,11 @@ export async function finishMcpOAuth(code: string, state: string, redirectUri: s
       code,
       redirect_uri: redirectUri,
       code_verifier: row.verifier,
-      resource: row.resource,
+      ...(row.omitResource ? {} : { resource: row.resource }),
     },
     row.clientId,
     row.clientSecret,
+    row.tokenAuth || "none",
   );
   if (!tok.access_token) {
     throw new Error(tok.error || "OAuth token exchange failed");
@@ -320,10 +355,15 @@ export async function refreshMcpAccessToken(key: string, resource?: string): Pro
   if (!refresh || !clientId) return false;
   const urlHint = resource || "";
   let tokenEndpoint = "";
+  let tokenAuth: "basic" | "post" | "none" = mcpClientSecret(key) ? "basic" : "none";
+  let omitResource = false;
   try {
     const discovered = await discoverAuthServer(urlHint || "https://mcp.notion.com/mcp");
     tokenEndpoint = discovered.meta.token_endpoint || "";
     resource = resource || discovered.resource;
+    const methods = stringList(discovered.meta.token_endpoint_auth_methods_supported);
+    if (methods.includes("client_secret_post")) tokenAuth = "post";
+    omitResource = isSlackMcpUrl(urlHint || resource || "");
   } catch {
     return false;
   }
@@ -333,10 +373,11 @@ export async function refreshMcpAccessToken(key: string, resource?: string): Pro
     {
       grant_type: "refresh_token",
       refresh_token: refresh,
-      ...(resource ? { resource } : {}),
+      ...(omitResource || !resource ? {} : { resource }),
     },
     clientId,
     mcpClientSecret(key),
+    tokenAuth,
   );
   if (!tok.access_token) return false;
   setMcpTokens(key, {
