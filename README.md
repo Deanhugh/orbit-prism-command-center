@@ -225,6 +225,8 @@ The Jarvis home (`/jarvis`) chat — typed or spoken — is **Today**: brief, wh
 
 **Voice:** Morning Brief, Evening Wrap, and Today speak through a [Fish Audio](https://fish.audio/) library voice, not the browser’s default system voice. Open **Settings → Voice** (`/jarvis/settings?tab=voice`). Paste `FISH_API_KEY` (or set the same name on Railway), pick a public library voice (default is **JARVIS**), and Preview. Default model is `s2.1-pro-free` (Fish’s free developer tier). `s2.1-pro` needs [API credit](https://fish.audio/app/developers) — that wallet is separate from Fish website credit. If paid TTS returns insufficient credit, Command Center retries `s2.1-pro-free`. If Fish is down or still refuses, browser `speechSynthesis` runs and Settings shows the Fish error. This is a REST TTS call (`POST /api/jarvis/voice/speak`) — not an MCP connector.
 
+**Agents Office chat:** each desk thread (and Jarvis / Chief) can be wiped without deleting the desk. Type or say **clear the chat history** (also: *clear chat*, *wipe this conversation*, *reset the thread*). A **Clear Chat** button sits to the right of the chat capsule, outside it, bottom-right of the thread. Either path empties that conversation on disk (`data/chats/…json`) and the bubbles on screen. It does not clear other desks, Jarvis Today, or Command Center sections.
+
 The **+** menu on a desk ticket attaches a Brain note or a local file, and can open Browse MCP without leaving the floor.
 
 ## Department platforms on Railway

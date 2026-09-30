@@ -532,7 +532,7 @@ export function MessagesApp({ username }: { username: string }) {
         {/* composer — capsule chat + Clear Chat outside it */}
         <div className="relative z-30 overflow-visible border-t border-line px-5 py-3">
           <div className="flex items-end gap-2">
-          <div className="min-w-0 flex-1 overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
+            <div className="min-w-0 flex-1 overflow-visible rounded-2xl border border-line bg-canvas px-2.5 py-2 shadow-sm">
             <div className="flex items-end gap-2 overflow-visible">
               <ComposerPlus
                 skills={allSkills.filter((s) => {
@@ -623,16 +623,16 @@ export function MessagesApp({ username }: { username: string }) {
                 </button>
               )}
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void clearOpenChat()}
-            disabled={busy || (!messages.length && !draft)}
-            className="mb-1 shrink-0 self-end rounded-full border border-line bg-panel px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
-            title="Clear this chat history"
-          >
-            Clear Chat
-          </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => void clearOpenChat()}
+              disabled={busy || (!messages.length && !draft)}
+              className="mb-1 shrink-0 self-end rounded-full border border-line bg-panel px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-ink-soft hover:text-ink disabled:opacity-40"
+              title="Clear this chat history"
+            >
+              Clear Chat
+            </button>
           </div>
         </div>
       </main>
