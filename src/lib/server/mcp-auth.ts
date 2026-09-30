@@ -16,7 +16,10 @@ export function mcpAccessToken(key: string): string | undefined {
     getSecret(`${p}_ACCESS_TOKEN`) ||
     (k === "notion" ? getSecret("NOTION_TOKEN") || getSecret("NOTION_API_KEY") : undefined) ||
     (k === "apify" ? getSecret("APIFY_TOKEN") : undefined) ||
-    (k === "krea" || k === "kreaai" ? getSecret("KREA_API_TOKEN") || getSecret("KREA_TOKEN") : undefined)
+    (k === "krea" || k === "kreaai" ? getSecret("KREA_API_TOKEN") || getSecret("KREA_TOKEN") : undefined) ||
+    (k === "slack"
+      ? getSecret("SLACK_USER_TOKEN") || getSecret("SLACK_BOT_TOKEN") || getSecret("SLACK_TOKEN")
+      : undefined)
   );
 }
 
@@ -31,11 +34,13 @@ export function mcpExpiresAt(key: string): number {
 }
 
 export function mcpClientId(key: string): string | undefined {
-  return getSecret(`${prefix(mcpKey(key))}_CLIENT_ID`);
+  const k = mcpKey(key);
+  return getSecret(`${prefix(k)}_CLIENT_ID`) || (k === "slack" ? getSecret("SLACK_CLIENT_ID") : undefined);
 }
 
 export function mcpClientSecret(key: string): string | undefined {
-  return getSecret(`${prefix(mcpKey(key))}_CLIENT_SECRET`);
+  const k = mcpKey(key);
+  return getSecret(`${prefix(k)}_CLIENT_SECRET`) || (k === "slack" ? getSecret("SLACK_CLIENT_SECRET") : undefined);
 }
 
 export function setMcpTokens(

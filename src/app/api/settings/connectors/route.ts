@@ -9,10 +9,11 @@ import {
   updateLocalConfig,
 } from "@/lib/server/config";
 import { MCP_CATALOG, catalogItemByName, parseMcpCommand } from "@/lib/mcp-catalog";
-import { mcpAccessToken, setMcpTokens, clearMcpTokens, mcpKey } from "@/lib/server/mcp-auth";
+import { mcpAccessToken, mcpClientId, setMcpTokens, clearMcpTokens, mcpKey } from "@/lib/server/mcp-auth";
 import { probeRemoteConnector, isRemoteTransport } from "@/lib/server/mcp-remote";
 import { normalizeKreaUrl } from "@/lib/server/mcp-krea";
 import { normalizeHiggsfieldUrl } from "@/lib/server/mcp-higgsfield";
+import { normalizeSlackUrl, slackWorkspaceUrl } from "@/lib/server/mcp-slack";
 import { refreshMode } from "@/lib/server/runtime";
 
 export const runtime = "nodejs";
@@ -37,7 +38,7 @@ async function payload() {
       ? status.reason
       : connectors.some((c) => c.kind === "remote" && c.status === "connected")
         ? "Remote MCP live on this host"
-        : "Add a remote MCP (Notion, Apify, Krea, or Higgsfield) with OAuth or a token — npx commands are not live on Railway.",
+        : "Add a remote MCP (Notion, Apify, Krea, Higgsfield, or Slack) with OAuth or a token — npx commands are not live on Railway.",
     claude: status,
     connectors,
     deny: cfg.mcp.deny,
@@ -48,11 +49,13 @@ async function payload() {
       target: c.target,
       auth: c.auth || (isRemoteTransport(c.transport) ? "oauth" : "none"),
       hasToken: Boolean(mcpAccessToken(c.name)),
+      hasClient: Boolean(mcpClientId(c.name)),
     })),
     catalog: MCP_CATALOG.map((item) => ({
       ...item,
       enabled: enabledKeys.has(item.id) || enabledKeys.has(norm(item.name)) || enabledKeys.has(norm(item.id)),
     })),
+    slackWorkspace: slackWorkspaceUrl(),
   };
 }
 
@@ -110,6 +113,9 @@ export async function POST(req: NextRequest) {
   if (norm(name) === "higgsfield" || norm(name) === "higgsfeild" || /higgsfield\.ai/i.test(target)) {
     target = normalizeHiggsfieldUrl(target);
   }
+  if (norm(name) === "slack" || /slack\.com/i.test(target)) {
+    target = normalizeSlackUrl(target);
+  }
 
   const auth = (body.auth as string) || catalog?.auth || (isRemoteTransport(transport) ? "oauth" : "none");
   const depts = Array.isArray(body.depts) ? body.depts.map(String) : undefined;
@@ -123,6 +129,12 @@ export async function POST(req: NextRequest) {
   if (typeof body.token === "string") {
     const token = body.token.trim();
     setMcpTokens(mcpKey(name), { token: token || null });
+  }
+  if (typeof body.clientId === "string" || typeof body.clientSecret === "string") {
+    setMcpTokens(mcpKey(name), {
+      clientId: typeof body.clientId === "string" ? body.clientId.trim() || null : undefined,
+      clientSecret: typeof body.clientSecret === "string" ? body.clientSecret.trim() || null : undefined,
+    });
   }
 
   if (transport === "stdio") {

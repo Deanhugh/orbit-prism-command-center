@@ -18,6 +18,7 @@ import {
   normalizeHiggsfieldUrl,
   runHiggsfieldForQuery,
 } from "./mcp-higgsfield";
+import { isSlackConnector, looksLikeSlackQuery, normalizeSlackUrl, runSlackForQuery } from "./mcp-slack";
 
 const probeCache = new Map<string, { at: number; value: McpProbe }>();
 
@@ -50,7 +51,9 @@ export async function probeRemoteConnector(conn: CustomConnector, force = false)
     ? normalizeHiggsfieldUrl(conn.target)
     : isKreaConnector(conn)
       ? normalizeKreaUrl(conn.target)
-      : conn.target;
+      : isSlackConnector(conn)
+        ? normalizeSlackUrl(conn.target)
+        : conn.target;
   const mcp = await openMcpSession({ key, url, token });
   if (mcp.ok) {
     probeCache.set(cacheKey, { at: Date.now(), value: mcp });
@@ -111,6 +114,14 @@ export async function searchRemoteConnector(conn: CustomConnector, query: string
     }
   }
 
+  if (isSlackConnector(conn) && probe.session) {
+    try {
+      return await runSlackForQuery(probe.session, query);
+    } catch (err) {
+      return err instanceof Error ? err.message : "Slack request failed";
+    }
+  }
+
   if (probe.session) {
     const tools = pickSearchTools(probe.session.tools.length ? probe.session.tools : probe.tools);
     const tool = tools[0];
@@ -138,6 +149,7 @@ export async function mcpContextForQuery(query: string): Promise<{ key: string; 
     if (isApifyConnector(conn) && !looksLikeScrapeQuery(q) && !/\bapify\b/i.test(q)) continue;
     if (isKreaConnector(conn) && !looksLikeKreaQuery(q)) continue;
     if (isHiggsfieldConnector(conn) && !looksLikeHiggsfieldQuery(q)) continue;
+    if (isSlackConnector(conn) && !looksLikeSlackQuery(q)) continue;
     const text = await searchRemoteConnector(conn, q);
     if (text) out.push({ key: mcpKey(conn.name), name: conn.name, text: text.slice(0, 2500) });
   }
