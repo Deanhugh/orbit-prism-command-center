@@ -5,6 +5,7 @@ import {
   DASHBOARD_BLANK_GEN,
   blankDashboardLists,
   emptyHub,
+  resolveOwnerName,
   type JarvisHub,
 } from "../jarvis-data";
 
@@ -49,12 +50,15 @@ export function readHub(userId: string, username: string): JarvisHub {
   try {
     const raw = JSON.parse(fs.readFileSync(hubPath(userId), "utf8")) as Partial<JarvisHub>;
     const hub = assembleHub(username, raw);
-    if ((hub.dashboardBlankGen ?? 0) < DASHBOARD_BLANK_GEN) {
-      const next = writeHub(userId, { ...hub, ...blankDashboardLists() });
+    const ownerName = resolveOwnerName(hub.profile.ownerName, username);
+    const named = ownerName !== hub.profile.ownerName ? { ...hub, profile: { ...hub.profile, ownerName } } : hub;
+    if ((named.dashboardBlankGen ?? 0) < DASHBOARD_BLANK_GEN) {
+      const next = writeHub(userId, { ...named, ...blankDashboardLists() });
       void refreshBriefsAfterBlank(next, username);
       return next;
     }
-    return hub;
+    if (named !== hub) return writeHub(userId, named);
+    return named;
   } catch {
     const fallback = emptyHub(username);
     writeHub(userId, fallback);

@@ -4,7 +4,7 @@ import { dataDir, loadConfig } from "./config";
 import { readHub } from "./jarvis-hub";
 import { JARVIS } from "../office-data";
 import { shortId } from "../utils";
-import { type JarvisHub } from "../jarvis-data";
+import { resolveOwnerName, type JarvisHub } from "../jarvis-data";
 import { composeBrief } from "./briefs";
 import { applyPersonalCommand, looksLikePersonalUpdate, type AppliedPersonalUpdate } from "./jarvis-commands";
 import { DEFAULT_TZ, formatClockInZone, isSameDayInZone } from "./zone";
@@ -22,13 +22,27 @@ function chatPath(userId: string) {
   return path.join(dataDir(), `jarvis-today-${userId}.json`);
 }
 
-export function readTodayChat(userId: string): TodayLine[] {
+function readTodayChatRaw(userId: string): TodayLine[] {
   try {
     const raw = JSON.parse(fs.readFileSync(chatPath(userId), "utf8")) as TodayLine[];
     return Array.isArray(raw) ? raw : [];
   } catch {
     return [];
   }
+}
+
+/** Drop yesterday's Today box so the transcript starts empty each local morning. */
+export function pruneTodayChat(userId: string, username = "operator", now = Date.now()): TodayLine[] {
+  const hub = readHub(userId, username);
+  const tz = hub.profile.timezone || DEFAULT_TZ;
+  const lines = readTodayChatRaw(userId);
+  const kept = lines.filter((line) => isSameDayInZone(line.ts, now, tz));
+  if (kept.length !== lines.length) writeTodayChat(userId, kept);
+  return kept;
+}
+
+export function readTodayChat(userId: string, username?: string, now = Date.now()): TodayLine[] {
+  return pruneTodayChat(userId, username, now);
 }
 
 export function writeTodayChat(userId: string, lines: TodayLine[]): TodayLine[] {
@@ -38,14 +52,18 @@ export function writeTodayChat(userId: string, lines: TodayLine[]): TodayLine[] 
   return next;
 }
 
-export function appendTodayLine(userId: string, line: Omit<TodayLine, "id" | "ts"> & Partial<TodayLine>): TodayLine {
+export function appendTodayLine(
+  userId: string,
+  line: Omit<TodayLine, "id" | "ts"> & Partial<TodayLine>,
+  username?: string,
+): TodayLine {
   const full: TodayLine = {
     id: line.id || shortId("j"),
     ts: line.ts || Date.now(),
     role: line.role,
     content: line.content,
   };
-  writeTodayChat(userId, [...readTodayChat(userId), full]);
+  writeTodayChat(userId, [...pruneTodayChat(userId, username, full.ts), full]);
   return full;
 }
 
@@ -55,7 +73,7 @@ export function todayBriefingText(userId: string, username: string, now = Date.n
 }
 
 function serializeBriefing(hub: JarvisHub, username: string, now: number): string {
-  const owner = hub.profile.ownerName || username;
+  const owner = resolveOwnerName(hub.profile.ownerName, username);
   const tz = hub.profile.timezone || DEFAULT_TZ;
   const clock = (ts: number) => formatClockInZone(ts, tz);
   const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
@@ -109,7 +127,7 @@ function serializeBriefing(hub: JarvisHub, username: string, now: number): strin
 /** Snapshot-grounded reply when the configured model is offline. */
 export function todayFallbackReply(userId: string, username: string, text: string, kind?: string): string {
   const hub = readHub(userId, username);
-  const owner = hub.profile.ownerName || "there";
+  const owner = resolveOwnerName(hub.profile.ownerName, username);
   const events = [...(hub.extraEvents ?? [])].sort((a, b) => a.start - b.start);
   const now = Date.now();
   const tz = hub.profile.timezone || DEFAULT_TZ;
@@ -184,6 +202,7 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
   return [
     `You are ${JARVIS.name}, the ${JARVIS.role} of ${cfg.name}. ${JARVIS.does}`,
     `You are speaking in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
+    `Address the owner as ${resolveOwnerName(readHub(userId, username).profile.ownerName, username)}. Never call them Operator.`,
     `You take typed and spoken instructions. Personal calendar, tasks, habits, goals, reminders, projects, and knowledge saves are already written onto the Command Center hub when the owner asks — confirm those in short spoken-friendly sentences.`,
     `When the owner asks for desk work (CAD, Studio, CRM, PMO, Finance, a post, scrape), the office already dispatches it — confirm the assignment.`,
     `You do not control the desktop, run Python, open apps, send system commands, or use Mark-LIV. If asked for those powers, say they are not on this panel.`,
@@ -257,7 +276,7 @@ export async function answerTodayChat(
     }
   }
 
-  const history = readTodayChat(userId);
+  const history = readTodayChat(userId, username);
   const prior = history.filter((line) => !(line.role === "user" && line.content === text)).slice(-16);
   const system = [
     todaySystemPrompt(userId, username, kind),

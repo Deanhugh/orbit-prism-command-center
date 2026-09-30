@@ -16,7 +16,7 @@ import {
   startOfDayInZone,
 } from "./zone";
 import type { BriefKind, StoredBrief, Task } from "../types";
-import { seedGoals, seedHabits, type JarvisHub } from "../jarvis-data";
+import { resolveOwnerName, seedGoals, seedHabits, type JarvisHub } from "../jarvis-data";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -96,7 +96,7 @@ function emptyBriefSections(kind: BriefKind): StoredBrief["sections"] {
 
 function briefOwnerLabel(): { owner: string; timezone: string } {
   const user = localUsers()[0];
-  return { owner: user?.username || "there", timezone: DEFAULT_TZ };
+  return { owner: resolveOwnerName(undefined, user?.username), timezone: DEFAULT_TZ };
 }
 
 function makeEmptyMorningBrief(
@@ -174,7 +174,7 @@ export function collectBriefFacts(
   ctx: { hub: JarvisHub; timezone: string; username: string } = ownerContext(),
 ): BriefFacts {
   const { hub, timezone, username } = ctx;
-  const owner = hub.profile.ownerName || username;
+  const owner = resolveOwnerName(hub.profile.ownerName, username);
   const date = dateKeyInZone(timezone, now);
   const clock = (ts: number) => formatClockInZone(ts, timezone);
   const tomorrowMs = addDaysInZone(timezone, now, 1);
