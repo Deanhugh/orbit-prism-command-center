@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { BriefKind } from "@/lib/types";
 import { composeBrief, latestBrief, liveFallbackBrief, loadBriefs } from "@/lib/server/briefs";
 import { emitBrief, ensureStarted, listOfficeTasks } from "@/lib/server/runtime";
+import { DEFAULT_TZ, dateKeyInZone } from "@/lib/server/zone";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +19,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ brief, briefs: stored });
   }
   const briefs = [...stored];
-  if (!briefs.some((b) => b.kind === "morning")) briefs.push(liveFallbackBrief("morning", tasks));
-  if (!briefs.some((b) => b.kind === "evening")) briefs.push(liveFallbackBrief("evening", tasks));
+  const today = dateKeyInZone(DEFAULT_TZ);
+  if (!briefs.some((b) => b.kind === "morning" && b.date === today)) briefs.push(liveFallbackBrief("morning", tasks));
+  if (!briefs.some((b) => b.kind === "evening" && b.date === today)) briefs.push(liveFallbackBrief("evening", tasks));
   return NextResponse.json({ briefs });
 }
 

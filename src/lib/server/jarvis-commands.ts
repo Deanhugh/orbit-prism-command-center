@@ -9,7 +9,7 @@ import {
   type JarvisTask,
 } from "../jarvis-data";
 import { patchHub, readHub } from "./jarvis-hub";
-import { refreshTodayBriefs } from "./briefs";
+import { clearMorningBriefForToday, refreshTodayBriefs } from "./briefs";
 import {
   DEFAULT_TZ,
   addDaysInZone,
@@ -137,7 +137,8 @@ export function looksLikePersonalUpdate(text: string, kind?: string): boolean {
   const hasClear = CLEAR_RE.test(t);
   const hasDate = DATE_RE.test(t) || hasMonthDay(t) || /\bon the \d{1,2}(st|nd|rd|th)?\b/.test(t);
   const hasAppointment = APPOINTMENT_RE.test(t);
-  if (hasClear && (hasSurface || ALL_SECTIONS_RE.test(t))) return true;
+  if (hasClear && looksLikeClearMorningBrief(t)) return true;
+  if (hasClear && (hasSurface || ALL_SECTIONS_RE.test(t)) && !/\bmorning brief\b/.test(t)) return true;
   if (hasSurface && hasAction) return true;
   if (hasSurface && hasDate) return true;
   if (hasAppointment && (hasAction || hasDate)) return true;
@@ -147,6 +148,30 @@ export function looksLikePersonalUpdate(text: string, kind?: string): boolean {
 
 export function isClearIntent(text: string): boolean {
   return CLEAR_RE.test(text);
+}
+
+export function looksLikeClearMorningBrief(text: string): boolean {
+  const t = text.toLowerCase();
+  if (!CLEAR_RE.test(t)) return false;
+  return /\b(morning brief|today'?s (morning )?brief|the brief(ing)? for today|brief for today)\b/.test(t);
+}
+
+async function applyClearMorningBrief(now: number): Promise<AppliedPersonalUpdate> {
+  const brief = clearMorningBriefForToday(now);
+  try {
+    const { emitBrief } = await import("./runtime");
+    emitBrief(brief);
+  } catch {
+    /* office runtime may be cold; persisted brief still stands */
+  }
+  return {
+    action: "clear",
+    surfaces: [],
+    title: "Morning Brief",
+    when: now,
+    reply: "Cleared today's Morning Brief. Today is empty until you add something.",
+    cleared: 1,
+  };
 }
 
 export function parsePersonalCommand(
@@ -188,6 +213,9 @@ export async function applyPersonalCommand(
 ): Promise<AppliedPersonalUpdate | null> {
   const hub = readHub(userId, username);
   const tz = hub.profile.timezone || DEFAULT_TZ;
+  if (looksLikeClearMorningBrief(text)) {
+    return applyClearMorningBrief(now);
+  }
   const parsed = parsePersonalCommand(text, tz, now);
   if (!parsed) return null;
 
@@ -431,7 +459,7 @@ async function applyClearCommand(
 
 function inferSurfaces(text: string, action: "add" | "clear" = "add"): PersonalSurface[] {
   const t = text.toLowerCase();
-  if (action === "clear" && ALL_SECTIONS_RE.test(t)) {
+  if (action === "clear" && ALL_SECTIONS_RE.test(t) && !/\bmorning brief\b/.test(t)) {
     return ["calendar", "task", "habit", "goal", "reminder"];
   }
   const out = new Set<PersonalSurface>();

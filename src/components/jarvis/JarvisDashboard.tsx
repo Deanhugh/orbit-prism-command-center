@@ -78,7 +78,10 @@ export function JarvisDashboard({
   const overdue = tasks.filter((t) => t.due < startOfDay(now) && t.status !== "done").length;
   const todayEvents = events.filter((e) => isSameDay(e.start, now));
   const briefs = officeBriefs.length ? officeBriefs : fetchedBriefs;
-  const shownBrief = briefs.find((b) => b.kind === briefTab) || null;
+  const shownBrief =
+    [...briefs]
+      .filter((b) => b.kind === briefTab)
+      .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1))[0] || null;
 
   function openBrief(kind: "morning" | "evening") {
     setBriefTab(kind);

@@ -31,7 +31,10 @@ export function BriefingApp({ username }: { username: string }) {
   const briefs = streamed.length ? streamed : stored;
   const kind: BriefKind = tab === "Evening" ? "evening" : "morning";
   const current = useMemo(
-    () => briefs.find((b) => b.kind === kind) || null,
+    () =>
+      [...briefs]
+        .filter((b) => b.kind === kind)
+        .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : a.date < b.date ? 1 : -1))[0] || null,
     [briefs, kind],
   );
   const history = useMemo(() => briefs.slice(0, 20), [briefs]);
