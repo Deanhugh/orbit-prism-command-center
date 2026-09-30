@@ -7,8 +7,12 @@ import { formatClockHM, seedEvents, startOfDay, type JarvisEvent } from "@/lib/j
 export function CalendarApp() {
   const { hub } = useJarvisHub();
   const events = useMemo(
-    () => [...seedEvents(), ...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
-    [hub?.extraEvents],
+    () =>
+      [
+        ...(hub?.suppressSeeds?.calendar ? [] : seedEvents()),
+        ...(hub?.extraEvents ?? []),
+      ].sort((a, b) => a.start - b.start),
+    [hub?.extraEvents, hub?.suppressSeeds?.calendar],
   );
   const horizon = startOfDay(Date.now()) + 14 * 86400000;
   const upcoming = events.filter((e) => e.start < horizon);

@@ -67,12 +67,16 @@ export function JarvisDashboard({
     [officeTasks, hub?.extraTasks],
   );
   const events = useMemo(
-    () => [...seedEvents(), ...(hub?.extraEvents ?? [])].sort((a, b) => a.start - b.start),
-    [hub?.extraEvents],
+    () =>
+      [
+        ...(hub?.suppressSeeds?.calendar ? [] : seedEvents()),
+        ...(hub?.extraEvents ?? []),
+      ].sort((a, b) => a.start - b.start),
+    [hub?.extraEvents, hub?.suppressSeeds?.calendar],
   );
   const habits = useMemo(
-    () => [...seedHabits(), ...(hub?.extraHabits ?? [])],
-    [hub?.extraHabits],
+    () => [...(hub?.suppressSeeds?.habits ? [] : seedHabits()), ...(hub?.extraHabits ?? [])],
+    [hub?.extraHabits, hub?.suppressSeeds?.habits],
   );
   const done = new Set(hub?.habitsDone ?? []);
 

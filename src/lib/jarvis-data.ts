@@ -136,6 +136,11 @@ export interface JarvisCrmTaxonomy {
   statuses: string[];
 }
 
+export interface JarvisSuppressSeeds {
+  calendar?: boolean;
+  habits?: boolean;
+}
+
 export interface JarvisHub {
   profile: JarvisProfile;
   habitsDone: string[];
@@ -152,6 +157,7 @@ export interface JarvisHub {
   appearance: JarvisAppearance;
   crm: JarvisCrmTaxonomy;
   greetings: string[];
+  suppressSeeds: JarvisSuppressSeeds;
 }
 
 function day(offset: number, hour = 9, minute = 0): number {
@@ -538,6 +544,7 @@ export function emptyHub(username: string): JarvisHub {
     appearance: defaultAppearance(),
     crm: defaultCrmTaxonomy(),
     greetings: defaultGreetings(),
+    suppressSeeds: {},
   };
 }
 
