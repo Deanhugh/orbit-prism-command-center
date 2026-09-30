@@ -238,12 +238,11 @@ export function Providers() {
             <span className="tabular-nums">{cfg?.temperature ?? 0.6}</span>
           </label>
         </div>
-        {cfg?.provider === "openrouter" && (
-          <div className="mt-3">
+        <div className="mt-3">
             <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-ink-soft">OpenRouter favorites</p>
             <div className="flex flex-wrap gap-1.5">
               {OPENROUTER_FAVORITES.map((f) => {
-                const on = cfg.model === f.id;
+                const on = cfg?.model === f.id;
                 return (
                   <button
                     key={f.id}
@@ -268,7 +267,6 @@ export function Providers() {
               Gemini 1.5 is retired on OpenRouter — Flash and Pro here are the current Gemini line. Jev Router is optional (Jev picks which LLM answers). Desk routing and tool gates always use TypeSafe Jev 1.13 in the background when this OpenRouter key is set.
             </p>
           </div>
-        )}
         {cfg?.model ? (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink">
             <span className="rounded-full bg-emails/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emails">Saved</span>
