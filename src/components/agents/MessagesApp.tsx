@@ -491,7 +491,7 @@ export function MessagesApp({ username }: { username: string }) {
       {/* left: Agents list (top) + animated Office scene (bottom) */}
       <aside className="flex h-[70vh] w-full shrink-0 flex-col border-b border-line bg-panel/60 lg:h-full lg:w-[300px] lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-2 px-4 py-3">
-          <Brand size="office" />
+          <Brand size="office" tone="dark" />
           <Link href="/jarvis/settings?tab=mcp" className="ml-auto grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line text-ink-soft hover:text-ink" title="Settings">
             <Plus size={13} />
           </Link>

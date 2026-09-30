@@ -45,7 +45,7 @@ export function Brand({
         className={cn(
           "font-semibold uppercase",
           office
-            ? "mt-1 text-[9px] tracking-[0.14em]"
+            ? "mt-1 whitespace-nowrap text-[9px] tracking-[0.12em]"
             : "mt-[3px] text-[7px] tracking-[0.22em]",
           dark ? "text-white/55" : "text-ink-soft",
         )}
