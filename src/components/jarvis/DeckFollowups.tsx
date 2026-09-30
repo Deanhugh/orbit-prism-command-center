@@ -22,7 +22,11 @@ export function DeckFollowups({
   return (
     <>
       <GoalsCard goals={hub.goals ?? []} onChange={(goals) => save({ goals })} />
-      <RemindersCard reminders={hub.reminders ?? []} onChange={(reminders) => save({ reminders })} />
+      <RemindersCard
+        reminders={hub.reminders ?? []}
+        timeZone={hub.profile.timezone}
+        onChange={(reminders) => save({ reminders })}
+      />
       <RepliesCard replies={hub.replies ?? []} onChange={(replies) => save({ replies })} />
     </>
   );
@@ -133,9 +137,11 @@ function GoalsCard({
 
 function RemindersCard({
   reminders,
+  timeZone,
   onChange,
 }: {
   reminders: JarvisReminder[];
+  timeZone?: string;
   onChange: (next: JarvisReminder[]) => Promise<unknown>;
 }) {
   const now = Date.now();
@@ -158,9 +164,9 @@ function RemindersCard({
         </span>
       </p>
       <div className="mt-4 flex-1 space-y-4">
-        {overdue.length ? <ReminderGroup title={`Overdue (${overdue.length})`} items={overdue} onToggle={toggle} overdue /> : null}
-        <ReminderGroup title={`Today (${today.length})`} items={today} onToggle={toggle} />
-        <ReminderGroup title={`Upcoming (${upcoming.length})`} items={upcoming} onToggle={toggle} />
+        {overdue.length ? <ReminderGroup title={`Overdue (${overdue.length})`} items={overdue} onToggle={toggle} overdue timeZone={timeZone} /> : null}
+        <ReminderGroup title={`Today (${today.length})`} items={today} onToggle={toggle} timeZone={timeZone} />
+        <ReminderGroup title={`Upcoming (${upcoming.length})`} items={upcoming} onToggle={toggle} timeZone={timeZone} />
         {open.length === 0 ? <p className="text-[13px] text-ink-soft">Nothing waiting. The board is clear.</p> : null}
       </div>
     </section>
@@ -172,11 +178,13 @@ function ReminderGroup({
   items,
   onToggle,
   overdue,
+  timeZone,
 }: {
   title: string;
   items: JarvisReminder[];
   onToggle: (id: string) => void;
   overdue?: boolean;
+  timeZone?: string;
 }) {
   if (!items.length && !overdue) {
     return (
@@ -203,7 +211,7 @@ function ReminderGroup({
               </span>
               <span className="min-w-0 flex-1 text-[13px] leading-snug">{r.title}</span>
               <span className={cn("shrink-0 pt-0.5 text-[11px]", overdue ? "text-marketing" : "text-ink-soft")}>
-                {formatReminderWhen(r.when)}
+                {formatReminderWhen(r.when, timeZone)}
               </span>
             </button>
           </li>
@@ -281,10 +289,18 @@ function CardHead({
   );
 }
 
-function formatReminderWhen(ts: number) {
+function formatReminderWhen(ts: number, timeZone?: string) {
   const now = Date.now();
   if (isSameDay(ts, now)) {
-    return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return new Date(ts).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      ...(timeZone ? { timeZone } : {}),
+    });
   }
-  return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return new Date(ts).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
+  });
 }

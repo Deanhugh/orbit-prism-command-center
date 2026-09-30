@@ -12,7 +12,7 @@ export function CalendarApp() {
   );
   const horizon = startOfDay(Date.now()) + 14 * 86400000;
   const upcoming = events.filter((e) => e.start < horizon);
-  const groups = groupByDay(upcoming);
+  const groups = groupByDay(upcoming, hub?.profile.timezone);
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-8">
@@ -33,7 +33,7 @@ export function CalendarApp() {
                   <div className="min-w-0">
                     <p className="truncate text-[14px]">{e.title}</p>
                     <p className="mt-1 text-[11px] text-ink-soft">
-                      {formatClockHM(e.start)} – {formatClockHM(e.end)}
+                      {formatClockHM(e.start, hub?.profile.timezone)} – {formatClockHM(e.end, hub?.profile.timezone)}
                       {e.location ? ` · ${e.location}` : ""}
                     </p>
                   </div>
@@ -50,13 +50,14 @@ export function CalendarApp() {
   );
 }
 
-function groupByDay(events: JarvisEvent[]): [string, JarvisEvent[]][] {
+function groupByDay(events: JarvisEvent[], timeZone?: string): [string, JarvisEvent[]][] {
   const map = new Map<string, JarvisEvent[]>();
   for (const e of events) {
     const key = new Date(e.start).toLocaleDateString("en-US", {
       weekday: "long",
       month: "long",
       day: "numeric",
+      ...(timeZone ? { timeZone } : {}),
     }).toUpperCase();
     map.set(key, [...(map.get(key) || []), e]);
   }

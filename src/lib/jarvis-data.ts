@@ -606,8 +606,12 @@ export function formatWhen(ts: number): string {
   });
 }
 
-export function formatClockHM(ts = Date.now()): string {
-  return new Date(ts).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+export function formatClockHM(ts = Date.now(), timeZone?: string): string {
+  return new Date(ts).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  });
 }
 
 export function formatDayHead(ts: number): string {
