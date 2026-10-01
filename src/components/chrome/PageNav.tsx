@@ -14,6 +14,7 @@ const REST = [
   { href: "/sales", label: "Sales" },
   { href: "/finance", label: "Finance" },
   { href: "/marketing", label: "Marketing" },
+  { href: "/draw", label: "Draw" },
   { href: "/studio", label: "Studio" },
   { href: "/cad", label: "CAD" },
   { href: "/vault", label: "Vault" },
@@ -26,7 +27,7 @@ function isActive(pathname: string, href: string) {
 
 /**
  * Shared office-page nav. Lives in the top-right HeaderControls cluster
- * (Jarvis · Agents · PMO · Sales · Finance · Marketing · Studio · CAD · Vault).
+ * (Jarvis · Agents · PMO · Sales · Finance · Marketing · Draw · Studio · CAD · Vault).
  * The Agents Office left column shows
  * only the Orbit Prism wordmark — not this bar.
  */

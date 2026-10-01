@@ -36,6 +36,7 @@ const DEFAULT_WIRING: Record<string, DeptId[]> = {
   plane: ALL_DEPTS,
   trypost: ALL_DEPTS,
   studio: ALL_DEPTS,
+  draw: ALL_DEPTS,
   github: ALL_DEPTS,
   apify: ALL_DEPTS,
   krea: ALL_DEPTS,
@@ -114,6 +115,14 @@ function platformConnectors(): Connector[] {
       kind: "native",
       status: "connected",
       reason: "Orbit Studio — text-to-cut on /studio",
+      depts: ALL_DEPTS,
+    },
+    {
+      name: "Draw",
+      key: "draw",
+      kind: "native",
+      status: "connected",
+      reason: "Orbit Draw — Excalidraw whiteboard on /draw",
       depts: ALL_DEPTS,
     },
     {

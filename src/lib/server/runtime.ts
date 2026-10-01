@@ -33,6 +33,7 @@ import {
 import { createPost, socialSummary, trypostConfigured } from "./trypost";
 import { buildCadModel } from "./cad";
 import { buildStudioProduction } from "./studio";
+import { buildDrawBoard } from "./draw";
 import { formatMcpContext, mcpContextForQuery } from "./mcp-remote";
 
 interface AgentRT { used: number; limit: number; breaker: BreakerState; }
@@ -171,6 +172,7 @@ function heuristicAgent(dept: DeptId, title: string): string {
     for (const term of t.split(/\W+/)) { if (term.length > 3 && hay.includes(term)) score += 1; }
     if (a.lead) score -= 0.5;
     if (dept === "ops" && a.id === "op_comply" && /\b(cad|bracket|enclos|hilbert|flange|shaft|plate|housing|iot)\b/.test(t)) score += 3;
+    if (dept === "marketing" && a.id === "mk_gfx" && /\b(draw|sketch|whiteboard|flowchart|diagram|wireframe|excalidraw)\b/.test(t)) score += 3;
     if (score > bestScore) { bestScore = score; best = a; }
   }
   return best.id;
@@ -278,6 +280,10 @@ async function runTask(id: string) {
   if (allowed.includes("studio")) {
     const film = await studioForTask(task.title, task.agentId);
     if (film) { deliverable += `\n\n---\n\n### Studio\n${film}`; if (!usedTools.includes("studio")) usedTools.unshift("studio"); }
+  }
+  if (allowed.includes("draw")) {
+    const sketch = await drawForTask(task.title, task.agentId);
+    if (sketch) { deliverable += `\n\n---\n\n### Draw\n${sketch}`; if (!usedTools.includes("draw")) usedTools.unshift("draw"); }
   }
   if (allowed.includes("trypost")) {
     const social = await socialForTask(task.title, agent.name);
@@ -460,6 +466,19 @@ async function cadForTask(title: string, agentId: string): Promise<string | null
     return null;
   }
 }
+async function drawForTask(title: string, agentId: string): Promise<string | null> {
+  const t = title.toLowerCase();
+  if (!/\b(draw|sketch|whiteboard|flowchart|flow chart|diagram|wireframe|org chart|mind ?map|excalidraw)\b/.test(t)) {
+    return null;
+  }
+  try {
+    const { board } = buildDrawBoard(title, agentId);
+    if (!board) return null;
+    return `Sketched **${board.title}** (${board.elements.length} marks) on [/draw](/draw). ${board.steps[0]?.text || ""}`;
+  } catch {
+    return null;
+  }
+}
 async function studioForTask(title: string, agentId: string): Promise<string | null> {
   const t = title.toLowerCase();
   if (!/\b(video|film|reel|trailer|explainer|documentary|talking.?head|montage|spot|commercial|studio|cinematic)\b/.test(t)) {
@@ -520,6 +539,7 @@ export function actOnTask(id: string, action: "approve" | "reject"): Task | null
 function pickDept(text: string): DeptId {
   const t = text.toLowerCase();
   if (/\b(cad|hilbert|bracket|enclosure|flange|step file|3d model|mechanical part|housing|shaft)\b/.test(t)) return "ops";
+  if (/\b(draw|sketch|whiteboard|flowchart|flow chart|diagram|wireframe|org chart|mind ?map|excalidraw)\b/.test(t)) return "marketing";
   if (/\b(video|film|reel|trailer|studio|cinematic|explainer|talking.?head|montage)\b/.test(t)) return "marketing";
   if (/\b(invoice|bill|payable|reconcil|finance|books|overdue|stripe)\b/.test(t)) return "finance";
   if (/\b(deal|lead|prospect|pipeline|crm|proposal|outbound|inbound)\b/.test(t)) return "sales";

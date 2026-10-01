@@ -8,7 +8,7 @@ const TOOL_YES_THRESHOLD = 0.8;
 const CHOICE_MIN = 0.35;
 
 const DEPT_CRITERIA: Record<DeptId, string> = {
-  marketing: "Marketing — social, brand, content, video, scrape, image or video generate, TryPost, Krea, Higgsfield",
+  marketing: "Marketing — social, brand, content, video, draw, whiteboard, flowchart, scrape, image or video generate, TryPost, Krea, Higgsfield",
   emails: "PMO — tickets, sprints, milestones, Plane, project plans, program management",
   delivery: "Account Management — client accounts, retention, onboarding, renewals, health",
   sales: "Sales — deals, leads, pipeline, CRM, proposals, outbound or inbound",
