@@ -29,6 +29,7 @@ import { HeaderControls } from "@/components/chrome/HeaderControls";
 import { useOrbitInit } from "@/lib/use-orbit-init";
 import { useOffice } from "@/lib/store";
 import { McpNav } from "@/components/jarvis/McpNav";
+import { JarvisDictationProvider } from "@/components/jarvis/JarvisDictation";
 import type { McpNavApp } from "@/lib/mcp-nav";
 
 const APPS = [
@@ -117,6 +118,7 @@ export function JarvisShell({
   }
 
   return (
+    <JarvisDictationProvider>
     <div className="flex h-screen w-screen overflow-hidden bg-canvas text-ink">
       <aside
         className={cn(
@@ -178,6 +180,7 @@ export function JarvisShell({
         <main className="min-h-0 flex-1 overflow-y-auto thin-scroll">{children}</main>
       </div>
     </div>
+    </JarvisDictationProvider>
   );
 }
 
