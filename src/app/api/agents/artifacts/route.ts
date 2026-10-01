@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   artifactCsv,
+  artifactDocx,
   artifactHtml,
   artifactPdf,
+  artifactPptx,
+  artifactXlsx,
   readArtifact,
   saveArtifact,
-  wordDoc,
 } from "@/lib/server/artifacts";
 import type { ArtifactKind } from "@/lib/artifacts";
 import { inferArtifactKind } from "@/lib/artifacts";
@@ -36,13 +38,12 @@ export async function GET(req: NextRequest) {
   if (format === "json") return NextResponse.json({ artifact: meta });
 
   const safe = meta.title.replace(/[^\w.-]+/g, "_").slice(0, 60) || "deliverable";
-  if (format === "html" || format === "preview" || format === "pptx") {
+  if (format === "html" || format === "preview") {
     const html = artifactHtml(meta);
-    const filename = format === "pptx" ? `${safe}.html` : `${safe}.html`;
     return new Response(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
-        "Content-Disposition": format === "preview" ? "inline" : `attachment; filename="${filename}"`,
+        "Content-Disposition": format === "preview" ? "inline" : `attachment; filename="${safe}.html"`,
         "Cache-Control": "no-store",
       },
     });
@@ -58,16 +59,36 @@ export async function GET(req: NextRequest) {
     });
   }
   if (format === "doc" || format === "docx" || format === "word") {
-    const doc = wordDoc(meta);
+    const doc = await artifactDocx(meta);
     return new Response(new Uint8Array(doc), {
       headers: {
-        "Content-Type": "application/msword",
-        "Content-Disposition": `attachment; filename="${safe}.doc"`,
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Disposition": `attachment; filename="${safe}.docx"`,
         "Cache-Control": "no-store",
       },
     });
   }
-  if (format === "csv" || format === "xlsx" || format === "xls") {
+  if (format === "xlsx" || format === "xls") {
+    const xlsx = await artifactXlsx(meta);
+    return new Response(new Uint8Array(xlsx), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${safe}.xlsx"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+  if (format === "pptx" || format === "ppt") {
+    const pptx = await artifactPptx(meta);
+    return new Response(new Uint8Array(pptx), {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "Content-Disposition": `attachment; filename="${safe}.pptx"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
+  if (format === "csv") {
     const csv = artifactCsv(meta);
     return new Response(csv, {
       headers: {
