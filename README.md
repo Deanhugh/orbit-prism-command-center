@@ -10,7 +10,7 @@ Railway fallback (works before DNS is live): https://command-center-production-e
 
 Repo: [Deanhugh/orbit-prism-command-center](https://github.com/Deanhugh/orbit-prism-command-center)
 
-The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center, Agents Office, PMO, Sales, Finance, Marketing, Studio, CAD, and Vault share the **same top-right** cluster: **Jarvis · Agents · PMO · Sales · Finance · Marketing · Studio · CAD · Vault**, then **Live · OpenRouter** and the clock. The pills never sit next to the logo or page title on the left — logo/title stay left, nav stays right. There is no Email / Mautic item in nav. Marketing, Studio, Sales, PMO, CAD, Finance, Vault, and Agents Office all show the full **Orbit Prism Operating System Command Center** lockup (the same `/orbit-command-center.png` mark as Jarvis) — the header left side is 220–268px so ORBIT PRISM is readable, not a 16px ink bar that vanishes on the dark canvas. The Agents Office **top-left** column is 360px wide. Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
+The office is a Next.js app: Jarvis (Today, briefing, calendar), a 3D Agents floor (33 desks), and department boards. Command Center, Agents Office, PMO, Sales, Finance, Marketing, Draw, Studio, CAD, and Vault share the **same top-right** cluster: **Jarvis · Agents · PMO · Sales · Finance · Marketing · Draw · Studio · CAD · Vault**, then **Live · OpenRouter** and the clock. The pills never sit next to the logo or page title on the left — logo/title stay left, nav stays right. There is no Email / Mautic item in nav. Marketing, Draw, Studio, Sales, PMO, CAD, Finance, Vault, and Agents Office all show the full **Orbit Prism Operating System Command Center** lockup (the same `/orbit-command-center.png` mark as Jarvis) — the header left side is 220–268px so ORBIT PRISM is readable, not a 16px ink bar that vanishes on the dark canvas. The Agents Office **top-left** column is 360px wide. Command Center’s left **System** list includes **Agents office** and an **MCP** section (icon + name for every enabled MCP app).
 
 What landed in this stack:
 
@@ -20,10 +20,10 @@ What landed in this stack:
 - **Routines** — Morning Brief and Evening Wrap on the dashboard
 - **Jarvis Today** — spoken/typed chat that can dispatch office work
 - **Jarvis voice** — Fish Audio library TTS (default JARVIS), browser speech as fallback
-- **CAD** (`/cad`) and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
+- **CAD** (`/cad`), **Draw** (`/draw` — Excalidraw whiteboard), and **Studio** (`/studio`) pages, **Finance** (`/finance` / Bigcapital), **Vault** (`/vault`)
 - **Agents Office** — three-pane floor (desks, chat, artifact downloads); 360px left column with the full Orbit Prism lockup; chat-pill model list hides Demo
 - **Command Center chrome** — same top-right page nav + Live + clock as Agents Office; that cluster stays right-aligned on every office page; left System → MCP lists enabled apps (icon + name)
-- **Office page lockup** — Marketing, Studio, Sales, PMO, CAD, Finance, and Vault use the full Orbit Prism Command Center mark in the top-left (header is taller so it fits)
+- **Office page lockup** — Marketing, Draw, Studio, Sales, PMO, CAD, Finance, and Vault use the full Orbit Prism Command Center mark in the top-left (header is taller so it fits)
 - **OpenRouter favorites** — Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router at the top of the Agents picker and Settings
 - **Jev 1.13** — TypeSafe decision model on the same OpenRouter key: picks the desk for Jarvis-routed work and gates agent tool calls; the chat LLM still writes the reply
 - **Custom domain** — `app.orbitprism.com` on Railway; `www.orbitprism.com` stays on Vercel. Footer Login on the marketing site should open `https://app.orbitprism.com/login`
@@ -296,6 +296,18 @@ Command Center vars: `BIGCAPITAL_API_URL`, `BIGCAPITAL_APP_URL`, `BIGCAPITAL_API
 
 `/api/pm/config` reports `mode: live` and `reachable: true`. Tokens live at `{workspace}/settings/account/api-tokens` (key name **Command Center**).
 
+### Draw — `/draw` (Excalidraw whiteboard)
+
+Orbit-native drawing studio using [`@excalidraw/excalidraw`](https://github.com/excalidraw/excalidraw). Left: prompt + drawing-agent log + **voice** (mic or Space). Right: the live Excalidraw board. This is **not** the official Excalidraw MCP App (`https://mcp.excalidraw.com`) — Command Center does not render MCP Apps. Agents get native tools instead.
+
+- Page: https://app.orbitprism.com/draw
+- Nav order: Marketing, **Draw**, Studio
+- Agents: every desk has `draw` (`draw_sketch`, `draw_list`, `draw_get`). Brand (`mk_gfx`) is the usual owner; architecture prompts can go to Engineering Lead
+- Named sketches: flowchart, architecture, wireframe, org chart, mind map. Other prompts get labeled cards and arrows
+- Boards persist in `data/draw-boards.json` on the host volume. Hand edits on the canvas save back to the same file
+
+Prompt on the page, say **“draw a flowchart of onboarding”** to Jarvis (voice or type), or assign a desk task that mentions draw / sketch / whiteboard / diagram — the run loop writes the board and links `/draw`. Say **“open Draw”** in Today and Jarvis opens the page.
+
 ### CAD — `/cad` (text to part)
 
 Orbit-native engineering studio. Left: prompt + engineering-agent build log. Right: Three.js viewport that fills in as solids are placed. This is **not** a vendored CAD kernel (CascadeStudio / Zoo Design Studio / Cursor). Agents emit a box-solid model the browser can mesh.
@@ -375,6 +387,6 @@ Optional MCP tokens (same names as Settings → MCP) if you prefer env over the 
 | `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | Slack app for MCP OAuth (no DCR) |
 | `SLACK_USER_TOKEN` / `SLACK_BOT_TOKEN` / `SLACK_TOKEN` | Slack token if you skip OAuth |
 
-OAuth and pasted tokens also land in `/app/data/secrets.json`. Custom connectors persist in `/app/data/connectors.json`. Routines persist in `/app/data/routines.json`. CAD and Studio files are `cad-models.json` and `studio-productions.json` on the same volume.
+OAuth and pasted tokens also land in `/app/data/secrets.json`. Custom connectors persist in `/app/data/connectors.json`. Routines persist in `/app/data/routines.json`. CAD, Draw, and Studio files are `cad-models.json`, `draw-boards.json`, and `studio-productions.json` on the same volume.
 
 OAuth callback the vendor must allow: `https://app.orbitprism.com/api/settings/connectors/oauth/callback` (Railway fallback: `{RAILWAY_URL}/api/settings/connectors/oauth/callback`).

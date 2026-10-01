@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
   }
 
   appendTodayLine(user.id, { role: "user", content: text }, user.username);
-  const { reply, applied } = await answerTodayChat(user.id, user.username, text, kind);
+  const { reply, applied, open } = await answerTodayChat(user.id, user.username, text, kind);
   const saved = appendTodayLine(user.id, { role: "assistant", content: reply }, user.username);
   const hub = readHub(user.id, user.username);
 
@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
       messages: readTodayChat(user.id, user.username),
       applied,
       hub,
+      open,
     }),
     user,
     minted,

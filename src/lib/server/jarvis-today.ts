@@ -155,7 +155,17 @@ export function todayFallbackReply(userId: string, username: string, text: strin
     ];
     return bits.filter(Boolean).join(" ");
   }
-  return `I am here, ${owner}. Ask for the brief, who is waiting, or tell me what to assign — CAD, Studio, CRM, PMO, Finance, or a post.`;
+  return `I am here, ${owner}. Ask for the brief, who is waiting, or tell me what to assign — CAD, Studio, Draw, CRM, PMO, Finance, or a post.`;
+}
+
+/** True when the owner only wants the Draw page opened (no new sketch). */
+export function looksLikeOpenDraw(text: string): boolean {
+  const t = text.toLowerCase().trim();
+  if (!t) return false;
+  if (/^(open|go to|show|take me to)\s+(the\s+)?draw(ing)?(\s+(page|board|canvas|tool))?[.!?]*$/.test(t)) {
+    return true;
+  }
+  return /^(draw|whiteboard|excalidraw)[.!?]*$/.test(t);
 }
 
 /** True when the owner is asking Jarvis to put a desk to work (not a brief / greeting). */
@@ -172,7 +182,7 @@ export function looksLikeOfficeTask(text: string, kind?: string): boolean {
   const hasThenWork = /\b(and then|then |build|create|draft|make|assign)\b/.test(t);
   if (briefOnly && !hasThenWork) return false;
   if (
-    /\b(build|create|draft|make|design|film|shoot|cut|post|invoice|bill|reconcil|cad|studio|deal|lead|prospect|research|write|run|assign|schedule|onboard|chase|publish|model|open a|log a|raise|enrich|propose|video|reel|part|bracket)\b/.test(
+    /\b(build|create|draft|make|design|film|shoot|cut|post|invoice|bill|reconcil|cad|studio|draw|sketch|whiteboard|flowchart|diagram|wireframe|deal|lead|prospect|research|write|run|assign|schedule|onboard|chase|publish|model|open a|log a|raise|enrich|propose|video|reel|part|bracket)\b/.test(
       t,
     )
   ) {
@@ -204,7 +214,7 @@ export function todaySystemPrompt(userId: string, username: string, kind?: strin
     `You are speaking in the Command Center Today panel. Same character as the office Chief: concise, direct, operational.`,
     `Address the owner as ${resolveOwnerName(readHub(userId, username).profile.ownerName, username)}. Never call them Operator.`,
     `You take typed and spoken instructions. Personal calendar, tasks, habits, goals, reminders, projects, and knowledge saves are already written onto the Command Center hub when the owner asks — confirm those in short spoken-friendly sentences.`,
-    `When the owner asks for desk work (CAD, Studio, CRM, PMO, Finance, a post, scrape), the office already dispatches it — confirm the assignment.`,
+    `When the owner asks for desk work (CAD, Studio, Draw, CRM, PMO, Finance, a post, scrape), the office already dispatches it — confirm the assignment.`,
     `You do not control the desktop, run Python, open apps, send system commands, or use Mark-LIV. If asked for those powers, say they are not on this panel.`,
     `Do not invent calendar items, people, or tasks that are not in the snapshot or this conversation.`,
     briefLine,
@@ -230,7 +240,11 @@ export async function answerTodayChat(
   username: string,
   text: string,
   kind: string,
-): Promise<{ reply: string; applied: AppliedPersonalUpdate | null }> {
+): Promise<{ reply: string; applied: AppliedPersonalUpdate | null; open?: string }> {
+  if (kind !== "brief" && looksLikeOpenDraw(text)) {
+    return { reply: "Opening Draw. Speak or type a diagram there, or keep talking here and I will assign a desk to sketch it.", applied: null, open: "/draw" };
+  }
+
   if (kind !== "brief") {
     const applied = await applyPersonalCommand(userId, username, text);
     if (applied) return { reply: applied.reply, applied };

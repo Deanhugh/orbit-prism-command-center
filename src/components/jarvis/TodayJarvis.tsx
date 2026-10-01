@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowUp, Mic, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSpaceToTalk, useVoice } from "@/lib/use-voice";
@@ -44,6 +45,7 @@ export function TodayJarvis({
   const [voiceOut, setVoiceOut] = useState(true);
   const [speaking, setSpeaking] = useState(false);
   const [speechOk, setSpeechOk] = useState(true);
+  const router = useRouter();
   const endRef = useRef<HTMLDivElement>(null);
   const busyRef = useRef(false);
   const voiceOutRef = useRef(true);
@@ -102,11 +104,12 @@ export function TodayJarvis({
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(preset ? { preset } : { text }),
       });
-      const data = (await res.json()) as { messages?: Line[]; error?: string; hub?: JarvisHub };
+      const data = (await res.json()) as { messages?: Line[]; error?: string; hub?: JarvisHub; open?: string };
       if (!res.ok) throw new Error(data.error || "Jarvis could not take that.");
       const next = data.messages || [];
       setMessages(next);
       if (data.hub) notifyHubChanged(data.hub);
+      if (data.open === "/draw") router.push("/draw");
       const last = next.filter((l) => l.role === "assistant").at(-1);
       if (last && voiceOutRef.current) {
         speakJarvis(last.content, {
@@ -120,7 +123,7 @@ export function TodayJarvis({
       busyRef.current = false;
       setBusy(false);
     }
-  }, [setSpeaker]);
+  }, [router, setSpeaker]);
 
   const onVoice = useCallback(
     (text: string) => {
