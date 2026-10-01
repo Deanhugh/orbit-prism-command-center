@@ -5,8 +5,8 @@ import type { ArtifactMeta } from "@/lib/artifacts";
 
 const DOWNLOADS: { format: string; label: string; icon: typeof FileText }[] = [
   { format: "pdf", label: "PDF", icon: FileText },
-  { format: "doc", label: "Word", icon: FileText },
-  { format: "csv", label: "Excel", icon: FileSpreadsheet },
+  { format: "docx", label: "Word", icon: FileText },
+  { format: "xlsx", label: "Excel", icon: FileSpreadsheet },
   { format: "pptx", label: "Presentation", icon: Presentation },
 ];
 
@@ -57,6 +57,14 @@ export function ArtifactPane({
             Video
           </a>
         )}
+        <a
+          href={href("csv")}
+          download
+          className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] text-ink-soft hover:text-ink"
+        >
+          <FileSpreadsheet size={11} />
+          CSV
+        </a>
         <a
           href={href("md")}
           download

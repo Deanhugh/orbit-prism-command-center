@@ -324,6 +324,4 @@ function wrapLine(s: string, width: number): string[] {
   return out;
 }
 
-export function wordDoc(meta: ArtifactMeta): Buffer {
-  return Buffer.from(artifactHtml(meta), "utf8");
-}
+export { artifactDocx, artifactXlsx, artifactPptx } from "./office-export";

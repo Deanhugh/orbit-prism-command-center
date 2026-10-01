@@ -6,6 +6,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@excalidraw/excalidraw"],
+  serverExternalPackages: ["docx", "exceljs", "pptxgenjs"],
   // Pin the app to this folder. A stray package-lock.json in the home
   // directory otherwise makes Turbopack treat all of ~ as the workspace
   // (slow first load, "Loading…" hang, huge memory).
