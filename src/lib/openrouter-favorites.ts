@@ -33,8 +33,36 @@ export const OPENROUTER_FAVORITES: OpenRouterFavorite[] = [
   },
 ];
 
+/** OpenRouter Free Models Router — $0 pool, never the office default. */
+export const OPENROUTER_FREE_ROUTER = "openrouter/free";
+
+export const OPENROUTER_FREE_ROUTER_OPTION: OpenRouterFavorite = {
+  id: OPENROUTER_FREE_ROUTER,
+  label: "Free router",
+  hint: "Optional — OpenRouter picks a $0 model that matches tools/vision",
+};
+
 export const OPENROUTER_FAVORITE_IDS = OPENROUTER_FAVORITES.map((f) => f.id);
+
+export function isOpenRouterFreeModel(id: string): boolean {
+  const m = id.trim();
+  return m === OPENROUTER_FREE_ROUTER || m.endsWith(":free");
+}
 
 export function favoriteLabel(model: string): string | undefined {
   return OPENROUTER_FAVORITES.find((f) => f.id === model)?.label;
+}
+
+export function freeModelLabel(model: string): string | undefined {
+  if (model === OPENROUTER_FREE_ROUTER) return OPENROUTER_FREE_ROUTER_OPTION.label;
+  if (model.endsWith(":free")) {
+    const base = model.slice(0, -5);
+    const short = base.split("/").pop() || base;
+    return `${short} (free)`;
+  }
+  return undefined;
+}
+
+export function modelPickerLabel(model: string): string {
+  return favoriteLabel(model) || freeModelLabel(model) || model;
 }

@@ -7,7 +7,7 @@ import {
 import { claudePrompt, claudeStatus } from "./claude";
 import type { ChatUsage } from "../agents-types";
 import { estimateTokens } from "../artifacts";
-import { OPENROUTER_FAVORITES } from "../openrouter-favorites";
+import { OPENROUTER_FAVORITES, OPENROUTER_FREE_ROUTER } from "../openrouter-favorites";
 import { jevAllowTool } from "./jev";
 
 export interface ChatMsg {
@@ -82,10 +82,11 @@ export async function listModels(id: ProviderId): Promise<string[]> {
   if (id === "claude") return ["sonnet", "opus", "fable"];
   if (id === "demo") return ["demo"];
   const base = baseUrlFor(id);
-  if (!base) return id === "openrouter" ? OPENROUTER_FAVORITES.map((f) => f.id) : [];
+  if (!base) return id === "openrouter" ? [...OPENROUTER_FAVORITES.map((f) => f.id), OPENROUTER_FREE_ROUTER] : [];
   const names = new Set<string>();
   if (id === "openrouter") {
     for (const f of OPENROUTER_FAVORITES) names.add(f.id);
+    names.add(OPENROUTER_FREE_ROUTER);
   }
   for (const b of urlVariants(base)) {
     try {

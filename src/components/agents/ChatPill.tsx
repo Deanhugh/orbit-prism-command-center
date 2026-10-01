@@ -7,7 +7,13 @@ import { cn } from "@/lib/utils";
 import { PILL_PLACEHOLDER, isDemoChoice, mentionQuery, slashSuggestions, type SlashCmd } from "@/lib/chat-commands";
 import { formatTokens } from "@/lib/artifacts";
 import type { ChatUsage } from "@/lib/agents-types";
-import { OPENROUTER_FAVORITES, favoriteLabel } from "@/lib/openrouter-favorites";
+import {
+  OPENROUTER_FAVORITES,
+  OPENROUTER_FREE_ROUTER,
+  OPENROUTER_FREE_ROUTER_OPTION,
+  isOpenRouterFreeModel,
+  modelPickerLabel,
+} from "@/lib/openrouter-favorites";
 
 type ChatMode = "chat" | "task" | "plan";
 interface SkillInfo { name: string; description?: string; department: string | null; agents: string[] }
@@ -249,7 +255,7 @@ function ModeMenu({ value, onChange }: { value: ChatMode; onChange: (m: ChatMode
 
 function displayModel(value: string) {
   if (!value || isDemoChoice("", value)) return "Model";
-  return favoriteLabel(value) || value;
+  return modelPickerLabel(value);
 }
 
 function ModelPicker({
@@ -272,10 +278,27 @@ function ModelPicker({
     return f.id.toLowerCase().includes(q) || f.label.toLowerCase().includes(q) || f.hint.toLowerCase().includes(q);
   });
   const favIds = new Set(OPENROUTER_FAVORITES.map((f) => f.id));
+  const freeFromCatalog = liveOptions
+    .filter((o) => o.provider === "openrouter" && o.model.endsWith(":free"))
+    .sort((a, b) => a.model.localeCompare(b.model));
+  const freeMatchesQuery = (id: string, label: string, hint?: string) => {
+    if (!q) return true;
+    return id.toLowerCase().includes(q) || label.toLowerCase().includes(q) || (hint || "").toLowerCase().includes(q);
+  };
+  const showFreeRouter = freeMatchesQuery(
+    OPENROUTER_FREE_ROUTER,
+    OPENROUTER_FREE_ROUTER_OPTION.label,
+    OPENROUTER_FREE_ROUTER_OPTION.hint,
+  );
+  const freeNamed = freeFromCatalog.filter((o) => freeMatchesQuery(o.model, modelPickerLabel(o.model)));
   const rest = (q
     ? liveOptions.filter((o) => o.model.toLowerCase().includes(q) || o.provider.toLowerCase().includes(q))
     : liveOptions
-  ).filter((o) => !(o.provider === "openrouter" && favIds.has(o.model)));
+  ).filter(
+    (o) =>
+      !(o.provider === "openrouter" && (favIds.has(o.model) || isOpenRouterFreeModel(o.model))),
+  );
+  const showFree = showFreeRouter || freeNamed.length > 0;
 
   function choose(model: string, nextProvider?: string) {
     if (isDemoChoice(nextProvider, model)) return;
@@ -335,10 +358,46 @@ function ModelPicker({
                   </button>
                 );
               })}
+              {showFree && (
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-soft">Free</div>
+              )}
+              {showFreeRouter && (
+                <button
+                  type="button"
+                  onClick={() => choose(OPENROUTER_FREE_ROUTER, "openrouter")}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink hover:bg-canvas-2"
+                  title={OPENROUTER_FREE_ROUTER_OPTION.hint}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {OPENROUTER_FREE_ROUTER_OPTION.label}
+                    <span className="ml-1 text-[10px] text-ink-soft">{OPENROUTER_FREE_ROUTER}</span>
+                  </span>
+                  {value === OPENROUTER_FREE_ROUTER && (provider === "openrouter" || !provider) && (
+                    <Check size={13} className="shrink-0 text-ink" />
+                  )}
+                </button>
+              )}
+              {freeNamed.map((o) => {
+                const selected = o.model === value && o.provider === provider;
+                return (
+                  <button
+                    key={`free:${o.model}`}
+                    type="button"
+                    onClick={() => choose(o.model, o.provider)}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-ink hover:bg-canvas-2"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {modelPickerLabel(o.model)}
+                      <span className="ml-1 text-[10px] text-ink-soft">{o.model}</span>
+                    </span>
+                    {selected && <Check size={13} className="shrink-0 text-ink" />}
+                  </button>
+                );
+              })}
               {rest.length > 0 && (
                 <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-ink-soft">All models</div>
               )}
-              {favorites.length === 0 && rest.length === 0 && (
+              {favorites.length === 0 && !showFree && rest.length === 0 && (
                 <p className="px-3 py-2 text-[11px] text-ink-soft">
                   {query.trim() ? `Press Enter to use “${query.trim()}”` : "No models yet — type a name."}
                 </p>

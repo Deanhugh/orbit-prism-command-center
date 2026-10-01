@@ -24,7 +24,7 @@ What landed in this stack:
 - **Agents Office** — three-pane floor (desks, chat, artifact pane); downloads are native **PDF**, **Word** (`.docx`), **Excel** (`.xlsx`), and **PowerPoint** (`.pptx`); 360px left column with the full Orbit Prism lockup; chat-pill model list hides Demo
 - **Command Center chrome** — same top-right page nav + Live + clock as Agents Office; that cluster stays right-aligned on every office page; left System → MCP lists enabled apps (icon + name)
 - **Office page lockup** — Marketing, Draw, Studio, Sales, PMO, CAD, Finance, and Vault use the full Orbit Prism Command Center mark in the top-left (header is taller so it fits)
-- **OpenRouter favorites** — Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router at the top of the Agents picker and Settings
+- **OpenRouter favorites** — Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router at the top of the Agents picker and Settings; a separate **Free** group lists `openrouter/free` and live `:free` models (pickable, never the default)
 - **Jev 1.13** — TypeSafe decision model on the same OpenRouter key: picks the desk for Jarvis-routed work and gates agent tool calls; the chat LLM still writes the reply
 - **Custom domain** — `app.orbitprism.com` on Railway; `www.orbitprism.com` stays on Vercel. Footer Login on the marketing site should open `https://app.orbitprism.com/login`
 
@@ -94,6 +94,15 @@ On Railway, **OpenRouter** is the supported Live path (any OpenRouter model id, 
 | Jev Router (optional) | `typesafe/jev-router` |
 
 Gemini **1.5** Pro/Flash are retired on OpenRouter — do not paste `google/gemini-pro-1.5`. Jev Router is optional: TypeSafe Jev chooses which chat LLM answers. You can still type any other OpenRouter id.
+
+**Free (optional, not the default)** — a second group in the Agents pill and Settings → Providers. Pick these only when you want $0 OpenRouter inference. The saved office model does not switch unless you click one.
+
+| Label | OpenRouter id |
+|---|---|
+| Free router | `openrouter/free` |
+| Named free models | any catalog id ending in `:free` |
+
+`openrouter/free` is OpenRouter’s Free Models Router: it picks a live $0 model that matches tools/vision. Named `:free` slugs stay on that one model. You still need `OPENROUTER_API_KEY`. Some free/alpha models log prompts and have tighter rate limits.
 
 **Jev 1.13 guardrail** (`typesafe/jev-1.13`) is not a chat model. With `OPENROUTER_API_KEY` set, Jarvis uses it to pick the department and desk for office work, and the Agents Office uses it to decide whether a tool may run. If Jev blocks a send/post/pay/delete (yes-probability under 0.8), the tool does not run and the LLM still writes the reply asking for owner approval. If Jev is down, routing falls back to the existing keyword/LLM path and tools fail open.
 
@@ -266,7 +275,7 @@ The Jarvis home (`/jarvis`) chat — typed or spoken — is **Today**: brief, wh
 
 **Agents Office** (`/agents`) is a three-pane floor: desks + 3D office on the left, chat in the middle, and an **artifact pane** on the right when a desk produces a document or video. The left column is **360px** so the full **Orbit Prism Operating System Command Center** lockup (the same `/orbit-command-center.png` mark as Jarvis) is readable — Jarvis and Agents stay in the top-right nav, not next to the logo. Ask for a document, report, spreadsheet, or deck (or click **Open in pane**) and the right pane opens with an HTML preview. Download chips above the preview are native Office files: **PDF** (`.pdf`), **Word** (`.docx`), **Excel** (`.xlsx`), **Presentation** (`.pptx`), plus Markdown and CSV. Word / Excel / PowerPoint open in Microsoft Office without a conversion step. **Video** appears when the reply includes a video URL from Studio / Krea / Higgsfield.
 
-The **chat pill** keeps the desk model picker on the **right** (next to Send). The picker lists **OpenRouter favorites** first (Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router), then the rest of the live catalog — it never shows **Demo**. When you assign work from Jarvis Today, **Jev 1.13** picks the department and desk; when a desk tries a tool, Jev gates send/post/pay/delete while the LLM still writes the reply. Chat / Task / Plan sits on the left after `+`. Type `/clear`, `/task`, `/plan`, `/chat`, or `/help`; type `@` to attach a Brain note. Stats under the pill show turns, tool steps, tok/s, tokens, and cache hit % — live usage when the model returns it (OpenRouter / OpenAI-style), otherwise an estimate and cache 0%. Each desk thread can still be wiped: say **clear the chat history** or use **Clear Chat** outside the pill. Settings are unchanged. The Demo provider remains in **Settings → Providers** as the offline fallback; the office header **Offline / Live** badge is separate from the pill.
+The **chat pill** keeps the desk model picker on the **right** (next to Send). The picker lists **OpenRouter favorites** first (Gemini Flash / Pro, Qwen, DeepSeek, optional Jev Router), then an optional **Free** group (`openrouter/free` plus live `:free` models — never auto-selected), then the rest of the live catalog — it never shows **Demo**. When you assign work from Jarvis Today, **Jev 1.13** picks the department and desk; when a desk tries a tool, Jev gates send/post/pay/delete while the LLM still writes the reply. Chat / Task / Plan sits on the left after `+`. Type `/clear`, `/task`, `/plan`, `/chat`, or `/help`; type `@` to attach a Brain note. Stats under the pill show turns, tool steps, tok/s, tokens, and cache hit % — live usage when the model returns it (OpenRouter / OpenAI-style), otherwise an estimate and cache 0%. Each desk thread can still be wiped: say **clear the chat history** or use **Clear Chat** outside the pill. Settings are unchanged. The Demo provider remains in **Settings → Providers** as the offline fallback; the office header **Offline / Live** badge is separate from the pill.
 
 The **+** menu on a desk ticket attaches a Brain note or a local file, and can open Browse MCP without leaving the floor.
 
