@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { OPENROUTER_FAVORITES } from "@/lib/openrouter-favorites";
+import {
+  OPENROUTER_FAVORITES,
+  OPENROUTER_FREE_ROUTER,
+  OPENROUTER_FREE_ROUTER_OPTION,
+  modelPickerLabel,
+} from "@/lib/openrouter-favorites";
 
 interface ProviderRow {
   id: string; label: string; local: boolean; openaiCompatible: boolean;
@@ -226,7 +231,8 @@ export function Providers() {
               {OPENROUTER_FAVORITES.map((f) => (
                 <option key={`fav:${f.id}`} value={f.id} label={f.label} />
               ))}
-              {models.filter((m) => !OPENROUTER_FAVORITES.some((f) => f.id === m)).map((m) => (
+              <option value={OPENROUTER_FREE_ROUTER} label={OPENROUTER_FREE_ROUTER_OPTION.label} />
+              {models.filter((m) => !OPENROUTER_FAVORITES.some((f) => f.id === m) && m !== OPENROUTER_FREE_ROUTER).map((m) => (
                 <option key={m} value={m} />
               ))}
             </datalist>
@@ -266,6 +272,47 @@ export function Providers() {
             <p className="mt-1.5 text-[10px] text-ink-soft">
               Gemini 1.5 is retired on OpenRouter — Flash and Pro here are the current Gemini line. Jev Router is optional (Jev picks which LLM answers). Desk routing and tool gates always use TypeSafe Jev 1.13 in the background when this OpenRouter key is set.
             </p>
+            <p className="mb-1.5 mt-3 text-[10px] font-bold uppercase tracking-widest text-ink-soft">OpenRouter free (optional)</p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                title={OPENROUTER_FREE_ROUTER_OPTION.hint}
+                onClick={() => {
+                  setModelDraft(OPENROUTER_FREE_ROUTER);
+                  void save({ provider: "openrouter", model: OPENROUTER_FREE_ROUTER }, `Saved. Active model is now ${OPENROUTER_FREE_ROUTER_OPTION.label}.`);
+                }}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                  cfg?.model === OPENROUTER_FREE_ROUTER ? "border-ink bg-ink text-canvas" : "border-line bg-canvas text-ink hover:bg-canvas-2",
+                )}
+              >
+                {OPENROUTER_FREE_ROUTER_OPTION.label}
+                <span className="ml-1 text-[9px] uppercase tracking-wide opacity-70">optional</span>
+              </button>
+              {models.filter((m) => m.endsWith(":free")).slice(0, 12).map((m) => {
+                const on = cfg?.model === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    title={m}
+                    onClick={() => {
+                      setModelDraft(m);
+                      void save({ provider: "openrouter", model: m }, `Saved. Active model is now ${modelPickerLabel(m)}.`);
+                    }}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                      on ? "border-ink bg-ink text-canvas" : "border-line bg-canvas text-ink hover:bg-canvas-2",
+                    )}
+                  >
+                    {modelPickerLabel(m)}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[10px] text-ink-soft">
+              $0 OpenRouter models. Not the default — pick Free router (<code>{OPENROUTER_FREE_ROUTER}</code>) or a named <code>:free</code> model only when you want them. Free models can be slower, rate-limited, or log prompts.
+            </p>
           </div>
         {cfg?.model ? (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-ink">
@@ -297,7 +344,7 @@ export function Providers() {
         <ol className="list-decimal space-y-1 pl-4 text-[11px] text-ink-soft">
           <li>Create a key at <a className="underline" href="https://openrouter.ai/keys" target="_blank" rel="noreferrer">openrouter.ai/keys</a>. Put it in Railway as <code>OPENROUTER_API_KEY</code>, or paste it in the OpenRouter row below.</li>
           <li>Set Active provider to <strong>OpenRouter</strong>. Base URL stays <code>https://openrouter.ai/api/v1</code>.</li>
-          <li>Pick a favorite (Gemini Flash / Pro, Qwen, DeepSeek, or optional Jev Router) or any other OpenRouter id, then Save. Click Test — the header should read <strong>Live · OpenRouter</strong>.</li>
+          <li>Pick a favorite (Gemini Flash / Pro, Qwen, DeepSeek, or optional Jev Router) or any other OpenRouter id, then Save. Optional: pick <strong>Free router</strong> (<code>openrouter/free</code>) or a <code>:free</code> model for $0 inference — that is never the default. Click Test — the header should read <strong>Live · OpenRouter</strong>.</li>
           <li>Ollama Cloud is optional: key at ollama.com, base URL <code>https://ollama.com/v1</code>. Local Ollama only works when this app runs on the Mac.</li>
         </ol>
       </section>
