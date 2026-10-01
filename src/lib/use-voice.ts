@@ -9,6 +9,9 @@ interface SpeechRecognitionResultLike {
 interface SpeechRecognitionEventLike {
   results: ArrayLike<SpeechRecognitionResultLike>;
 }
+interface SpeechRecognitionErrorLike {
+  error?: string;
+}
 interface SpeechRecognitionLike {
   lang: string;
   continuous: boolean;
@@ -17,7 +20,7 @@ interface SpeechRecognitionLike {
   stop: () => void;
   onresult: ((e: SpeechRecognitionEventLike) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e: SpeechRecognitionErrorLike) => void) | null;
 }
 type RecognitionCtor = new () => SpeechRecognitionLike;
 
@@ -30,12 +33,67 @@ function getRecognitionCtor(): RecognitionCtor | null {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 }
 
+export function speechRecognitionSupported(): boolean {
+  return !!getRecognitionCtor();
+}
+
+function recognitionErrorMessage(code?: string): string {
+  switch (code) {
+    case "not-allowed":
+      return "Microphone is blocked. Allow mic for this site, then press Space again.";
+    case "service-not-allowed":
+      return "This browser blocked speech recognition. Try Chrome or Edge.";
+    case "audio-capture":
+      return "No microphone found.";
+    case "network":
+      return "Speech service is unreachable. Check the network.";
+    case "no-speech":
+      return "No speech heard. Press Space and talk right away.";
+    case "aborted":
+      return "";
+    default:
+      return code ? `Voice failed (${code}).` : "Voice could not start.";
+  }
+}
+
+export function isEditableTarget(el: EventTarget | null): el is HTMLElement {
+  if (!(el instanceof HTMLElement)) return false;
+  const tag = el.tagName;
+  if (tag === "TEXTAREA") return true;
+  if (tag === "SELECT") return true;
+  if (tag === "INPUT") {
+    const type = (el as HTMLInputElement).type;
+    return !["button", "submit", "reset", "checkbox", "radio", "file", "range", "color", "hidden"].includes(type);
+  }
+  return el.isContentEditable || Boolean(el.closest("[contenteditable='true']"));
+}
+
+export function editableHasText(el: EventTarget | null): boolean {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return Boolean(el.value.trim());
+  }
+  if (el instanceof HTMLElement && (el.isContentEditable || el.closest("[contenteditable='true']"))) {
+    return Boolean(el.textContent?.trim());
+  }
+  return false;
+}
+
+function blurEmptyEditable() {
+  const el = document.activeElement;
+  if (!(el instanceof HTMLElement)) return;
+  if (!isEditableTarget(el)) return;
+  if (editableHasText(el)) return;
+  el.blur();
+}
+
 export function useVoice(onFinal: (text: string) => void) {
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
+  const [error, setError] = useState("");
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const finalRef = useRef(onFinal);
+  const stopSelf = useRef(false);
 
   useEffect(() => {
     finalRef.current = onFinal;
@@ -46,9 +104,22 @@ export function useVoice(onFinal: (text: string) => void) {
     return () => clearTimeout(id);
   }, []);
 
+  const stop = useCallback(() => {
+    stopSelf.current = true;
+    recRef.current?.stop();
+  }, []);
+
   const start = useCallback(() => {
     const Ctor = getRecognitionCtor();
-    if (!Ctor || recRef.current) return;
+    if (!Ctor) {
+      setSupported(false);
+      setError("Voice needs Chrome, Edge, or Safari — and a microphone.");
+      return;
+    }
+    if (recRef.current) return;
+    setError("");
+    stopSelf.current = false;
+    blurEmptyEditable();
     const rec = new Ctor();
     rec.lang = "en-US";
     rec.continuous = false;
@@ -70,7 +141,9 @@ export function useVoice(onFinal: (text: string) => void) {
       setInterim("");
       recRef.current = null;
     };
-    rec.onerror = () => {
+    rec.onerror = (e) => {
+      const msg = stopSelf.current ? "" : recognitionErrorMessage(e.error);
+      if (msg) setError(msg);
       setListening(false);
       setInterim("");
       recRef.current = null;
@@ -80,13 +153,10 @@ export function useVoice(onFinal: (text: string) => void) {
     try {
       rec.start();
     } catch {
-      setListening(false);
       recRef.current = null;
+      setListening(false);
+      setError("Voice could not start. Click the mic once to allow the microphone, then press Space.");
     }
-  }, []);
-
-  const stop = useCallback(() => {
-    recRef.current?.stop();
   }, []);
 
   const speak = useCallback((text: string) => {
@@ -99,29 +169,7 @@ export function useVoice(onFinal: (text: string) => void) {
     window.speechSynthesis.speak(u);
   }, []);
 
-  return { supported, listening, interim, start, stop, speak };
-}
-
-function isEditableTarget(el: EventTarget | null): el is HTMLInputElement | HTMLTextAreaElement {
-  if (!(el instanceof HTMLElement)) return false;
-  const tag = el.tagName;
-  if (tag === "TEXTAREA") return true;
-  if (tag === "SELECT") return true;
-  if (tag === "INPUT") {
-    const type = (el as HTMLInputElement).type;
-    return !["button", "submit", "reset", "checkbox", "radio", "file", "range", "color", "hidden"].includes(type);
-  }
-  return el.isContentEditable || Boolean(el.closest("[contenteditable='true']"));
-}
-
-function editableHasText(el: EventTarget | null): boolean {
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    return Boolean(el.value.trim());
-  }
-  if (el instanceof HTMLElement && el.isContentEditable) {
-    return Boolean(el.textContent?.trim());
-  }
-  return false;
+  return { supported, listening, interim, error, start, stop, speak };
 }
 
 /** Space starts or stops the mic, unless the user is typing a space in a filled field. */
@@ -146,10 +194,12 @@ export function useSpaceToTalk(opts: {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!enabledRef.current) return;
-      if (e.code !== "Space" && e.key !== " ") return;
+      const space = e.code === "Space" || e.key === " " || e.key === "Spacebar";
+      if (!space) return;
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (isEditableTarget(e.target) && editableHasText(e.target) && !listeningRef.current) return;
       e.preventDefault();
+      e.stopPropagation();
       if (listeningRef.current) stopRef.current();
       else startRef.current();
     }

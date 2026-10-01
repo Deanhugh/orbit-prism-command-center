@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUp, Mic, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSpaceToTalk, useVoice } from "@/lib/use-voice";
+import { useJarvisDictation, useRegisterJarvisDictation, TODAY_CHAT_EVENT } from "@/components/jarvis/JarvisDictation";
 import { jarvisSpeechSupported, primeJarvisSpeech, speakJarvis, stopJarvisSpeech } from "@/lib/speak-jarvis";
 import { JarvisCore, type JarvisMood } from "./JarvisCore";
 import { notifyHubChanged } from "@/lib/jarvis-events";
@@ -131,8 +131,8 @@ export function TodayJarvis({
     },
     [send],
   );
-  const { supported: voiceSupported, listening, interim, start, stop } = useVoice(onVoice);
-  useSpaceToTalk({ enabled: voiceSupported, listening, start, stop });
+  useRegisterJarvisDictation(onVoice);
+  const { supported: voiceSupported, listening, interim, error: voiceError, start, stop } = useJarvisDictation();
 
   useEffect(() => {
     let cancelled = false;
@@ -149,11 +149,13 @@ export function TodayJarvis({
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener(TODAY_CHAT_EVENT, onFocus);
     return () => {
       cancelled = true;
       window.clearInterval(id);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener(TODAY_CHAT_EVENT, onFocus);
     };
   }, []);
 
@@ -309,6 +311,7 @@ export function TodayJarvis({
           </button>
         </form>
         {error ? <p className="mt-2 text-[12px] text-marketing">{error}</p> : null}
+        {voiceError ? <p className="mt-2 text-[12px] text-marketing">{voiceError}</p> : null}
         {!speechOk ? (
           <p className="mt-2 text-[11px] text-ink-soft">Voice out needs Chrome, Edge, or Safari — and the speakers unmuted.</p>
         ) : null}
